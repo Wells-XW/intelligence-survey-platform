@@ -12,12 +12,13 @@
   - AI: 多模型路由(DeepSeek-R1 中文主力 + Claude 英文 + GPT-4.5 mini 批量)
   - 存储: PostgreSQL 16 + Elasticsearch 9.x + Garage(对象存储, 替代MinIO) + Redis 7
   - 部署: Docker Compose(MVP) → Kubernetes(Phase 2+)
-- PHASE 1 五项任务已完成：
+- **PHASE 1 全部六项任务完成** ✅：
   1. ✅ 需求深入验证与用户访谈 (requirements-validation-report-v1)
   2. ✅ 竞品功能详细拆解与差距分析 (competitor-feature-gap-analysis-v1)
   3. ✅ 技术架构设计与技术选型决策 (technical-architecture-and-stack-decision-v1)
   4. ✅ 核心模块 MVP：问卷设计器开发 (2026-05-14 完成初始代码脚手架)
   5. ✅ 数据安全与权限机制实现 (2026-05-14 完成五层安全架构)
+  6. ✅ 基础分析与可视化模块 (2026-05-14 完成 Analytics Engine + ECharts Dashboard)
 - 竞品验证核心结论：Qualtrics 贵且难用，SurveyMonkey 缺少学术模块，LimeSurvey 界面陈旧，问卷星功能全但无学术引导，空白市场确认存在
 - 差距分析核心发现：①AI+学术规范融合是全局空白 ②信效度检验内置是全局空白 ③PIPL合规是中文独有机会 ④学术个人$10-30/月定价区间完全空白 ⑤文献→问卷工作流无竞品实现
 - 四大差异化支柱：学术规范内置 + AI智能全流程 + 中文生态深度 + 可负担定价
@@ -64,3 +65,26 @@
 - passlib + bcrypt 版本兼容: bcrypt 锁定在 >=4.0.0,<4.1.0（passlib 1.7.4 不兼容 bcrypt 5.x）
 - shadcn/ui 组件: 11 组件已安装 (button, input, card, label, separator, dropdown-menu, tooltip, sonner, skeleton + 新增)
 - 前端认证流: Zustand store → localStorage 持久化 → 401 自动 refresh → 失败时登出
+
+## 2026-05-14 基础分析与可视化模块实现
+- ✅ Analytics Engine + ECharts 可视化仪表盘完成，已推送至 GitHub
+- 30 文件变更，~3,107 行新增代码
+- 后端分析引擎 (`core/analytics.py`):
+  - `compute_frequencies()`: 分类变量频率分布
+  - `compute_descriptive()`: 均值/中位数/众数/标准差
+  - `compute_cross_tab()`: 交叉分析 + χ² 检验
+  - `compute_cronbach_alpha()`: 原始 Cronbach's α 公式实现（纯 Python）
+  - `compute_response_quality()`: 速度检测/直线填答者/完成率
+  - `compute_text_summary()`: 开放题基本文本统计
+- SurveyResponse 模型: UUID PK + survey_id FK + JSONB answers + JSONB metadata(PIPL)
+- 数据采集 API: POST 公开提交(匿名) + GET/DELETE 鉴权检索
+- 分析 API: summary / reliability / cross-tab / response-quality / CSV export
+- 前端可视化:
+  - ECharts 图表组件: BarChart, PieChart, HeatmapChart
+  - 数据质量指标卡: 完成率/中位用时/速度/直线填答者
+  - Cronbach's α 展示卡: 带颜色编码(Excellent/Good/Acceptable/Questionable/Poor)
+  - 受访者填写页: SurveyJS Survey 渲染 + PIPL 知情同意复选框
+  - 四标签仪表盘: 描述统计/交叉分析/信度分析/数据质量
+- 测试: 13 个分析引擎单元测试全部通过（Cronbach's α 正确性验证）
+- Python 3.9 兼容修复: surveys.py 添加 `from __future__ import annotations`
+- 可视化库: ECharts 5.x via echarts-for-react（中文生态最优选择）
