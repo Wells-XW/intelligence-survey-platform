@@ -9,10 +9,16 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.database import Base
 from app.models import (  # noqa: F401 — ensure all models are loaded
     AuditLog,
+    ComplianceCheck,
     ConsentRecord,
+    Distribution,
+    Quota,
+    Recipient,
     RefreshToken,
+    SampleGroup,
     Survey,
     SurveyPermission,
+    SurveyResponse,
     User,
 )
 

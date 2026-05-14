@@ -46,6 +46,15 @@ class Survey(Base):
     responses = relationship(
         "SurveyResponse", back_populates="survey", cascade="all, delete-orphan"
     )
+    sample_groups = relationship(
+        "SampleGroup", back_populates="survey", cascade="all, delete-orphan"
+    )
+    distributions = relationship(
+        "Distribution", back_populates="survey", cascade="all, delete-orphan"
+    )
+    quotas = relationship(
+        "Quota", back_populates="survey", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Survey(id={self.id}, title={self.title!r}, status={self.status!r})>"

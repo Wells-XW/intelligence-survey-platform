@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import io
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -86,6 +87,24 @@ async def submit_response(
     db.add(response)
     await db.commit()
     await db.refresh(response)
+
+    # If respondent_id corresponds to a Recipient, update recipient status
+    # and increment matching quotas (sample distribution integration)
+    if body.respondent_id and body.is_complete:
+        from ...models.recipient import Recipient
+        from ...services.sample_service import update_quota_on_response
+
+        r_result = await db.execute(
+            select(Recipient).where(Recipient.id == body.respondent_id)
+        )
+        recipient = r_result.scalar_one_or_none()
+        if recipient and recipient.status != "completed":
+            recipient.status = "completed"
+            recipient.completed_at = datetime.now(timezone.utc)
+            db.add(recipient)
+            # Update matching quotas
+            await update_quota_on_response(db, body.respondent_id, sid)
+            await db.commit()
 
     return SurveyResponseOut.model_validate(response)
 

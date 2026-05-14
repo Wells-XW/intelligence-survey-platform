@@ -9,6 +9,8 @@ from .api.v1.ai import router as ai_router
 from .api.v1.analytics import router as analytics_router
 from .api.v1.auth import router as auth_router
 from .api.v1.compliance import router as compliance_router
+from .api.v1.distribution import router as distribution_router
+from .api.v1.distribution import public_router as distribution_public_router
 from .api.v1.health import router as health_router
 from .api.v1.knowledge_base import router as kb_router
 from .api.v1.responses import router as responses_router
@@ -61,5 +63,7 @@ app.include_router(compliance_router, prefix="/api/v1")
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(kb_router, prefix="/api/v1")
+app.include_router(distribution_public_router, prefix="/api/v1")
+app.include_router(distribution_router, prefix="/api/v1")
 app.include_router(responses_router, prefix="/api/v1")
 app.include_router(surveys_router, prefix="/api/v1")

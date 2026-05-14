@@ -660,3 +660,273 @@ export function getComplianceHistory(
     `/surveys/${surveyId}/compliance/history`,
   );
 }
+
+// ── Sample Distribution Types ───────────────────────────────────────────
+
+export interface SampleGroup {
+  id: string;
+  name: string;
+  description?: string | null;
+  recipient_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Recipient {
+  id: string;
+  sample_group_id: string;
+  email?: string | null;
+  name?: string | null;
+  demographics: Record<string, string>;
+  unique_token?: string;
+  status: 'pending' | 'sent' | 'opened' | 'started' | 'completed' | 'bounced' | 'opted_out';
+  sent_at?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+}
+
+export interface DistributionCampaign {
+  id: string;
+  survey_id: string;
+  sample_group_id: string;
+  name: string;
+  subject_template?: string | null;
+  body_template: Record<string, unknown>;
+  status: 'draft' | 'sending' | 'sent' | 'completed';
+  sent_count: number;
+  opened_count: number;
+  started_count: number;
+  completed_count: number;
+  scheduled_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuotaDefinition {
+  id: string;
+  name: string;
+  dimension: string;
+  target_count: number;
+  current_count: number;
+  criteria: Record<string, string>;
+  is_active: boolean;
+  fill_rate: number;
+}
+
+export interface DistributionDashboard {
+  survey_id: string;
+  survey_title: string;
+  total_recipients: number;
+  total_responded: number;
+  response_rate: number;
+  total_distributions: number;
+  active_distributions: number;
+  quotas: QuotaDefinition[];
+  sample_groups: SampleGroup[];
+}
+
+export interface RecipientImportResult {
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
+export interface SendDistributionResult {
+  distribution_id: string;
+  recipients_processed: number;
+  links_generated: number;
+}
+
+export interface TokenFillInfo {
+  survey_id: string;
+  survey_title: string;
+  recipient_id: string;
+  recipient_name: string | null;
+  token: string;
+  redirect_url: string;
+}
+
+// ── Sample Distribution API Helpers ─────────────────────────────────────
+
+// Sample Groups
+export function getSampleGroups(surveyId: string): Promise<SampleGroup[]> {
+  return api.get<SampleGroup[]>(`/surveys/${surveyId}/sample-groups`);
+}
+
+export function createSampleGroup(
+  surveyId: string,
+  data: { name: string; description?: string },
+): Promise<SampleGroup> {
+  return api.post<SampleGroup>(`/surveys/${surveyId}/sample-groups`, data);
+}
+
+export function updateSampleGroup(
+  surveyId: string,
+  gid: string,
+  data: { name?: string; description?: string },
+): Promise<SampleGroup> {
+  return api.put<SampleGroup>(`/surveys/${surveyId}/sample-groups/${gid}`, data);
+}
+
+export function deleteSampleGroup(
+  surveyId: string,
+  gid: string,
+): Promise<void> {
+  return api.delete<void>(`/surveys/${surveyId}/sample-groups/${gid}`);
+}
+
+// Recipients
+export function getRecipients(
+  surveyId: string,
+  gid: string,
+  params?: { limit?: number; offset?: number },
+): Promise<Recipient[]> {
+  const sp = new URLSearchParams();
+  if (params?.limit) sp.set('limit', String(params.limit));
+  if (params?.offset) sp.set('offset', String(params.offset));
+  const qs = sp.toString();
+  return api.get<Recipient[]>(
+    `/surveys/${surveyId}/sample-groups/${gid}/recipients${qs ? '?' + qs : ''}`,
+  );
+}
+
+export function addRecipient(
+  surveyId: string,
+  gid: string,
+  data: { email?: string; name?: string; demographics?: Record<string, string> },
+): Promise<Recipient> {
+  return api.post<Recipient>(
+    `/surveys/${surveyId}/sample-groups/${gid}/recipients`,
+    data,
+  );
+}
+
+export function importRecipientsCSV(
+  surveyId: string,
+  gid: string,
+  file: File,
+): Promise<RecipientImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = window.localStorage.getItem('isp_auth_tokens');
+  const accessToken = token ? JSON.parse(token).accessToken : null;
+  return fetch(
+    `/api/v1/surveys/${surveyId}/sample-groups/${gid}/recipients/import`,
+    {
+      method: 'POST',
+      headers: accessToken
+        ? { Authorization: `Bearer ${accessToken}` }
+        : {},
+      body: formData,
+    },
+  ).then((res) => res.json());
+}
+
+export function updateRecipient(
+  surveyId: string,
+  gid: string,
+  rid: string,
+  data: { email?: string; name?: string; demographics?: Record<string, string> },
+): Promise<Recipient> {
+  return api.put<Recipient>(
+    `/surveys/${surveyId}/sample-groups/${gid}/recipients/${rid}`,
+    data,
+  );
+}
+
+export function deleteRecipient(
+  surveyId: string,
+  gid: string,
+  rid: string,
+): Promise<void> {
+  return api.delete<void>(
+    `/surveys/${surveyId}/sample-groups/${gid}/recipients/${rid}`,
+  );
+}
+
+// Distributions
+export function getDistributions(
+  surveyId: string,
+): Promise<DistributionCampaign[]> {
+  return api.get<DistributionCampaign[]>(
+    `/surveys/${surveyId}/distributions`,
+  );
+}
+
+export function createDistribution(
+  surveyId: string,
+  data: {
+    sample_group_id: string;
+    name: string;
+    body_template?: Record<string, unknown>;
+  },
+): Promise<DistributionCampaign> {
+  return api.post<DistributionCampaign>(
+    `/surveys/${surveyId}/distributions`,
+    data,
+  );
+}
+
+export function sendDistribution(
+  surveyId: string,
+  did: string,
+): Promise<SendDistributionResult> {
+  return api.post<SendDistributionResult>(
+    `/surveys/${surveyId}/distributions/${did}/send`,
+  );
+}
+
+export function remindDistribution(
+  surveyId: string,
+  did: string,
+): Promise<SendDistributionResult> {
+  return api.post<SendDistributionResult>(
+    `/surveys/${surveyId}/distributions/${did}/remind`,
+  );
+}
+
+// Quotas
+export function getQuotas(surveyId: string): Promise<QuotaDefinition[]> {
+  return api.get<QuotaDefinition[]>(`/surveys/${surveyId}/quotas`);
+}
+
+export function createQuota(
+  surveyId: string,
+  data: {
+    name: string;
+    dimension: string;
+    target_count: number;
+    criteria: Record<string, string>;
+  },
+): Promise<QuotaDefinition> {
+  return api.post<QuotaDefinition>(`/surveys/${surveyId}/quotas`, data);
+}
+
+export function updateQuota(
+  surveyId: string,
+  qid: string,
+  data: {
+    name?: string;
+    target_count?: number;
+    criteria?: Record<string, string>;
+    is_active?: boolean;
+  },
+): Promise<QuotaDefinition> {
+  return api.put<QuotaDefinition>(
+    `/surveys/${surveyId}/quotas/${qid}`,
+    data,
+  );
+}
+
+export function deleteQuota(surveyId: string, qid: string): Promise<void> {
+  return api.delete<void>(`/surveys/${surveyId}/quotas/${qid}`);
+}
+
+// Dashboard
+export function getDistributionDashboard(
+  surveyId: string,
+): Promise<DistributionDashboard> {
+  return api.get<DistributionDashboard>(
+    `/surveys/${surveyId}/distribution-dashboard`,
+  );
+}

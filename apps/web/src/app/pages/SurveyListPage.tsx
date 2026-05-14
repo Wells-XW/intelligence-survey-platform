@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, MoreVertical, Trash2, Copy, BarChart3, ExternalLink } from 'lucide-react';
+import { Plus, FileText, MoreVertical, Trash2, Copy, BarChart3, Send, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, type SurveyListItem } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -192,6 +192,10 @@ function SurveyCard({
             <DropdownMenuItem onClick={() => navigate(`/survey/${survey.id}/analytics`)}>
               <BarChart3 className="mr-2 h-4 w-4" />
               分析
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/survey/${survey.id}/distribution`)}>
+              <Send className="mr-2 h-4 w-4" />
+              样本发放
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
