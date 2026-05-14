@@ -307,3 +307,89 @@ def build_quality_check_prompt(
         "",
         "Return a quality report following the system prompt JSON schema.",
     ])
+
+
+# ── Ethics Compliance Review Prompt (T10) ───────────────────────────────
+
+ETHICS_REVIEW_SYSTEM = """You are an academic research ethics and regulatory
+compliance expert. Your role is to review survey questionnaires for ethics,
+privacy, and regulatory compliance issues.
+
+## Framework
+- China: PIPL (Personal Information Protection Law, effective 2021-11-01)
+- EU/International: GDPR (General Data Protection Regulation)
+- Research ethics: Declaration of Helsinki, APA ethical principles, AAPOR code
+- Academic IRB standards
+
+## Review Dimensions
+1. **Informed Consent**: Is consent properly obtained? Is it explicit and informed?
+2. **Data Minimization**: Is only necessary data collected? Are there any
+   requests for excessive personal information?
+3. **Sensitive Data Protection**: Are special-category data (religion, health,
+   ethnicity, political views, biometrics, location) properly protected with
+   additional safeguards?
+4. **Vulnerable Populations**: Does the survey target vulnerable groups
+   (minors, patients, prisoners, economically disadvantaged)? If so, are
+   additional protections in place?
+5. **Risk-Benefit Balance**: Does the potential benefit outweigh privacy risks?
+6. **Cultural Sensitivity**: Are questions culturally appropriate for the
+   target population (Chinese academic context)?
+7. **Question Wording Ethics**: Are any questions leading, coercive, or
+   likely to cause psychological distress?
+
+## Output Format
+Return a JSON object:
+{
+  "overall_risk": "low|medium|high|critical",
+  "sections": [
+    {
+      "dimension": "informed_consent|data_minimization|sensitive_data|vulnerable|risk_benefit|cultural|wording",
+      "finding": "description of the finding",
+      "severity": "info|warning|error",
+      "suggestion": "actionable recommendation",
+      "reference": "legal/ethical reference (e.g., PIPL Art.14)"
+    }
+  ],
+  "summary": "1-2 paragraph overall assessment in Chinese"
+}
+"""
+
+
+def build_ethics_review_prompt(
+    survey_text: str,
+    language: str = "zh",
+    focus_areas: list[str] | None = None,
+) -> str:
+    """Build a user prompt for AI-assisted ethics compliance review.
+
+    Args:
+        survey_text: Extracted text content of the survey questionnaire.
+        language: Survey language ("zh" or "en").
+        focus_areas: Specific areas to focus on (pipl, gdpr, bias, sensitive, etc.).
+            If None, reviews all dimensions.
+    """
+    parts: list[str] = [
+        "Please review the following survey questionnaire for ethics and "
+        "regulatory compliance issues.",
+        "",
+    ]
+
+    if focus_areas:
+        areas_str = ", ".join(focus_areas)
+        parts.append(f"Focus areas: {areas_str}")
+        parts.append("")
+
+    parts.extend([
+        f"Survey language: {'Chinese (中文)' if language == 'zh' else 'English'}",
+        "",
+        "## Survey Content",
+        "```",
+        survey_text[:8000],  # Cap at 8K chars
+        "```",
+        "",
+        "Return a comprehensive ethics review following the system prompt "
+        "JSON schema. Write the **summary** in Chinese, and use both Chinese "
+        "and English for legal references as appropriate.",
+    ])
+
+    return "\n".join(parts)

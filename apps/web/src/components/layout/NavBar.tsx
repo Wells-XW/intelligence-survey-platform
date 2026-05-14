@@ -1,5 +1,14 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, GraduationCap, Library, LogOut, Sparkles, User } from 'lucide-react';
+import {
+  BarChart3,
+  BookOpen,
+  GraduationCap,
+  Library,
+  LogOut,
+  Shield,
+  Sparkles,
+  User,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -19,6 +28,15 @@ export function NavBar() {
     logout();
     navigate('/login', { replace: true });
   };
+
+  // Read last visited survey ID from localStorage for analytics links
+  const lastSurveyId = (() => {
+    try {
+      return localStorage.getItem('isp_last_survey_id');
+    } catch {
+      return null;
+    }
+  })();
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-surface">
@@ -57,6 +75,26 @@ export function NavBar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {lastSurveyId && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">分析</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-40">
+                <DropdownMenuItem onClick={() => navigate(`/survey/${lastSurveyId}/analytics`)}>
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  数据质量
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(`/survey/${lastSurveyId}/analytics/ethics`)}>
+                  <Shield className="mr-2 h-4 w-4" />
+                  伦理合规
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         <DropdownMenu>

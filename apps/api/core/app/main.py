@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api.v1.ai import router as ai_router
 from .api.v1.analytics import router as analytics_router
 from .api.v1.auth import router as auth_router
+from .api.v1.compliance import router as compliance_router
 from .api.v1.health import router as health_router
 from .api.v1.knowledge_base import router as kb_router
 from .api.v1.responses import router as responses_router
@@ -56,6 +57,7 @@ app.add_middleware(
 # API Routes
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(compliance_router, prefix="/api/v1")
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(kb_router, prefix="/api/v1")

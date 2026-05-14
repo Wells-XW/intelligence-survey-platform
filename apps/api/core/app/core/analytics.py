@@ -445,6 +445,13 @@ def compute_response_quality(
         if qname_dropouts:
             dropout_question, dropout_count = qname_dropouts.most_common(1)[0]
 
+    # Extended quality metrics (T9)
+    answers_list = [r.get("answers", {}) for r in responses]
+    missing_patterns = compute_missing_patterns(answers_list, questions)
+    inconsistency = compute_inconsistency_scores(answers_list, questions)
+    time_dist = compute_response_time_distribution(responses)
+    attention = compute_attention_check_performance(answers_list, questions)
+
     return {
         "total_responses": total,
         "complete_responses": complete_count,
@@ -456,6 +463,325 @@ def compute_response_quality(
         "straightliner_count": straightliner_count,
         "dropout_question": dropout_question,
         "dropout_count": dropout_count,
+        # T9 extended metrics
+        "missing_patterns": missing_patterns,
+        "inconsistency_rate": inconsistency["inconsistency_rate"],
+        "inconsistent_respondents": inconsistency["inconsistent_respondents"],
+        "response_time_distribution": time_dist,
+        "attention_check_pass_rate": attention["pass_rate"],
+    }
+
+
+# ── Text Summary (Basic) ──────────────────────────────────────────────
+
+
+# ── Missing Pattern Analysis ───────────────────────────────────────────
+
+
+def compute_missing_patterns(
+    answers_list: list[dict],
+    questions: list[dict],
+) -> dict:
+    """Analyze patterns in missing/omitted answers.
+
+    Detects: per-item missing rate, per-respondent missing distribution,
+    and item-pair co-missing patterns (which questions tend to be
+    skipped together — may indicate problematic skip logic).
+
+    Returns: {
+        "per_item_missing": {qname: {"count": int, "rate": float}},
+        "co_missing_pairs": [{"q1": str, "q2": str, "co_miss_count": int, "rate": float}],
+        "respondent_distribution": [{"missing_count": int, "n_respondents": int}],
+    }
+    """
+    n_responses = len(answers_list)
+    if n_responses == 0:
+        return {
+            "per_item_missing": {},
+            "co_missing_pairs": [],
+            "respondent_distribution": [],
+        }
+
+    qnames = [q["name"] for q in questions]
+
+    # Per-item missing
+    per_item_missing: dict[str, dict] = {}
+    for qname in qnames:
+        missing = sum(1 for a in answers_list if a.get(qname) is None)
+        per_item_missing[qname] = {
+            "count": missing,
+            "rate": round(missing / n_responses, 4),
+        }
+
+    # Per-respondent missing count distribution
+    miss_counts: Counter = Counter()
+    for ans in answers_list:
+        n_miss = sum(1 for qname in qnames if ans.get(qname) is None)
+        miss_counts[n_miss] += 1
+
+    respondent_distribution = [
+        {"missing_count": k, "n_respondents": v}
+        for k, v in sorted(miss_counts.items())
+    ]
+
+    # Co-missing pairs (items that are both missing in the same response)
+    co_missing_pairs: list[dict] = []
+    for i, qa in enumerate(qnames):
+        for j in range(i + 1, len(qnames)):
+            qb = qnames[j]
+            co_miss = sum(
+                1 for a in answers_list
+                if a.get(qa) is None and a.get(qb) is None
+            )
+            if co_miss >= 2:  # only report notable co-missing
+                co_missing_pairs.append({
+                    "q1": qa,
+                    "q2": qb,
+                    "co_miss_count": co_miss,
+                    "rate": round(co_miss / n_responses, 4),
+                })
+
+    # Sort by rate descending
+    co_missing_pairs.sort(key=lambda x: x["rate"], reverse=True)
+
+    return {
+        "per_item_missing": per_item_missing,
+        "co_missing_pairs": co_missing_pairs[:10],  # top 10
+        "respondent_distribution": respondent_distribution,
+    }
+
+
+# ── Inconsistency Detection ────────────────────────────────────────────
+
+
+def compute_inconsistency_scores(
+    answers_list: list[dict],
+    questions: list[dict],
+) -> dict:
+    """Detect response inconsistencies — forward vs reverse-coded items.
+
+    In a well-designed Likert scale, forward-coded and reverse-coded items
+    should correlate negatively. If a respondent gives high scores to both
+    a forward item and its reverse-coded counterpart, the response is
+    flagged as inconsistent.
+
+    Detects reverse-coded items by checking for "reverse" keywords in
+    the question title. Compares each respondent's answers on forward
+    vs reverse items and flags contradictions.
+
+    Returns: {
+        "inconsistent_respondents": int,
+        "total_rate": float,
+        "per_respondent_flags": [{respondent_idx, flag_count, details}, ...],
+    }
+    """
+    # Identify forward and reverse-coded items
+    forward_names: list[str] = []
+    reverse_names: list[str] = []
+    for q in questions:
+        title = q.get("title", q.get("name", "")).lower()
+        if "reverse" in title or "反向" in title or "反向计分" in title:
+            reverse_names.append(q["name"])
+        elif _is_likert(q):
+            forward_names.append(q["name"])
+
+    if not forward_names or not reverse_names:
+        return {
+            "inconsistent_respondents": 0,
+            "inconsistency_rate": 0.0,
+            "per_respondent_flags": [],
+        }
+
+    # Detect contradictions: high on both forward AND reverse items
+    # (assuming 5+ point scale, consider 4+ as "high")
+    per_respondent_flags: list[dict] = []
+    inconsistent_count = 0
+
+    for idx, ans in enumerate(answers_list):
+        contradiction_count = 0
+        details: list[str] = []
+
+        for f_name in forward_names:
+            f_val = ans.get(f_name)
+            if f_val is None:
+                continue
+            try:
+                f_num = float(f_val)
+            except (TypeError, ValueError):
+                continue
+
+            for r_name in reverse_names:
+                r_val = ans.get(r_name)
+                if r_val is None:
+                    continue
+                try:
+                    r_num = float(r_val)
+                except (TypeError, ValueError):
+                    continue
+
+                # Both ≥ 4 → contradiction (reverse item should be low)
+                if f_num >= 4 and r_num >= 4:
+                    contradiction_count += 1
+                    details.append(f"{f_name}<->{r_name}")
+
+        if contradiction_count > 0:
+            inconsistent_count += 1
+            per_respondent_flags.append({
+                "respondent_index": idx,
+                "flag_count": contradiction_count,
+                "details": details[:5],  # cap at 5
+            })
+
+    return {
+        "inconsistent_respondents": inconsistent_count,
+        "inconsistency_rate": round(
+            inconsistent_count / len(answers_list), 4
+        ) if answers_list else 0.0,
+        "per_respondent_flags": per_respondent_flags[:20],  # cap at 20
+    }
+
+
+# ── Response Time Distribution ─────────────────────────────────────────
+
+
+def compute_response_time_distribution(
+    responses: list[dict],
+) -> dict:
+    """Analyze per-question response time distribution.
+
+    Returns quantiles (P5/P25/P50/P75/P95), outlier identification,
+    and summary statistics.
+
+    Returns: {
+        "quantiles": dict,
+        "fast_threshold": float,
+        "slow_threshold": float,
+        "fast_respondents": int,
+        "slow_respondents": int,
+    }
+    """
+    times = [
+        r.get("metadata", {}).get("completion_time_seconds", 0)
+        for r in responses
+        if r.get("metadata", {}).get("completion_time_seconds")
+    ]
+
+    if not times:
+        return {
+            "quantiles": {},
+            "fast_threshold": 0.0,
+            "slow_threshold": 0.0,
+            "fast_respondents": 0,
+            "slow_respondents": 0,
+        }
+
+    sorted_times = sorted(times)
+    n = len(sorted_times)
+
+    def _quantile(pct: float) -> float:
+        idx = int(pct * (n - 1))
+        return round(float(sorted_times[idx]), 1)
+
+    p5 = _quantile(0.05)
+    p95 = _quantile(0.95)
+    p25 = _quantile(0.25)
+    p50 = _quantile(0.50)
+    p75 = _quantile(0.75)
+
+    fast_count = sum(1 for t in times if t < p5) if p5 > 0 else 0
+    slow_count = sum(1 for t in times if t > p95) if p95 > 0 else 0
+
+    return {
+        "quantiles": {
+            "p5": p5,
+            "p25": p25,
+            "p50": p50,
+            "p75": p75,
+            "p95": p95,
+        },
+        "fast_threshold": p5,
+        "slow_threshold": p95,
+        "fast_respondents": fast_count,
+        "slow_respondents": slow_count,
+    }
+
+
+# ── Attention Check Analysis ───────────────────────────────────────────
+
+
+def compute_attention_check_performance(
+    answers_list: list[dict],
+    questions: list[dict],
+) -> dict:
+    """Analyze attention check items embedded in the survey.
+
+    Attention check questions are identified by SurveyJS custom properties:
+    ``isAttentionCheck: true`` in the question definition.
+
+    Returns: {
+        "attention_items": [qname, ...],
+        "total_checks": int,
+        "pass_count": int,
+        "fail_count": int,
+        "pass_rate": float,
+        "failed_respondents": [index, ...],
+    }
+    """
+    attention_items = [
+        q for q in questions
+        if q.get("isAttentionCheck", False)
+    ]
+    attention_names = [q["name"] for q in attention_items]
+
+    if not attention_names:
+        return {
+            "attention_items": [],
+            "total_checks": 0,
+            "pass_count": 0,
+            "fail_count": 0,
+            "pass_rate": 0.0,
+            "failed_respondents": [],
+        }
+
+    # For each attention check, the correct answer is specified
+    # (e.g., "correctAnswer" or "attentionAnswer" in question metadata)
+    correct_map: dict[str, str] = {}
+    for q in attention_items:
+        correct = q.get("correctAnswer") or q.get("attentionAnswer")
+        if correct is not None:
+            correct_map[q["name"]] = str(correct)
+
+    failed_indices: list[int] = []
+    total_checks = 0
+    pass_count = 0
+    fail_count = 0
+
+    for idx, ans in enumerate(answers_list):
+        respondent_passed = True
+        for qname in attention_names:
+            if qname not in correct_map:
+                continue
+            total_checks += 1
+            val = ans.get(qname)
+            if val is not None and str(val) == correct_map[qname]:
+                pass_count += 1
+            else:
+                fail_count += 1
+                respondent_passed = False
+        if not respondent_passed:
+            failed_indices.append(idx)
+
+    # pass_rate based on checks, not respondents
+    total = pass_count + fail_count
+    pass_rate = round(pass_count / total * 100, 1) if total > 0 else 0.0
+
+    return {
+        "attention_items": attention_names,
+        "total_checks": total_checks,
+        "pass_count": pass_count,
+        "fail_count": fail_count,
+        "pass_rate": pass_rate,
+        "failed_respondents": failed_indices[:50],  # cap at 50
     }
 
 

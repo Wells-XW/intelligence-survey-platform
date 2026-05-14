@@ -1,5 +1,6 @@
 from .ai_generation_log import AiGenerationLog
 from .audit_log import AuditLog
+from .compliance_check import ComplianceCheck
 from .consent_record import ConsentRecord
 from .knowledge_entry import KnowledgeEntry
 from .knowledge_scale import KnowledgeScale
@@ -13,6 +14,7 @@ from .user import User
 __all__ = [
     "AiGenerationLog",
     "AuditLog",
+    "ComplianceCheck",
     "ConsentRecord",
     "KnowledgeEntry",
     "KnowledgeScale",

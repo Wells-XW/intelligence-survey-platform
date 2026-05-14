@@ -205,7 +205,19 @@ function SummaryTab({
   return (
     <div className="space-y-6">
       {/* Quality cards at top */}
-      {quality && <QualityIndicators {...quality} />}
+      {quality && <QualityIndicators
+        completionRate={quality.completion_rate}
+        avgCompletionSeconds={quality.avg_completion_seconds}
+        medianCompletionSeconds={quality.median_completion_seconds}
+        speederCount={quality.speeder_count}
+        speederThreshold={quality.speeder_threshold_seconds}
+        straightlinerCount={quality.straightliner_count}
+        totalResponses={quality.total_responses}
+        completeResponses={quality.complete_responses}
+        inconsistencyRate={quality.inconsistency_rate}
+        inconsistentRespondents={quality.inconsistent_respondents}
+        attentionCheckPassRate={quality.attention_check_pass_rate}
+      />}
 
       {/* Per-question charts */}
       {summary.questions.map((q) => (
@@ -473,8 +485,68 @@ function QualityTab({
           ))}
         </div>
       ) : quality ? (
-        <QualityIndicators {...quality} />
+        <QualityIndicators
+          completionRate={quality.completion_rate}
+          avgCompletionSeconds={quality.avg_completion_seconds}
+          medianCompletionSeconds={quality.median_completion_seconds}
+          speederCount={quality.speeder_count}
+          speederThreshold={quality.speeder_threshold_seconds}
+          straightlinerCount={quality.straightliner_count}
+          totalResponses={quality.total_responses}
+          completeResponses={quality.complete_responses}
+          inconsistencyRate={quality.inconsistency_rate}
+          inconsistentRespondents={quality.inconsistent_respondents}
+          attentionCheckPassRate={quality.attention_check_pass_rate}
+        />
       ) : null}
+
+      {/* Extended Quality Details */}
+      {quality?.response_time_distribution?.quantiles &&
+        Object.keys(quality.response_time_distribution.quantiles).length > 0 && (
+          <Card>
+            <CardContent className="p-5">
+              <h3 className="mb-4 font-medium text-gray-900">响应时间分位数</h3>
+              <div className="grid grid-cols-5 gap-2 text-center">
+                {Object.entries(quality.response_time_distribution.quantiles).map(([key, val]) => (
+                  <div key={key} className="rounded-lg bg-muted/50 p-3">
+                    <p className="text-xs text-muted-foreground">{key.toUpperCase()}</p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums">{val}s</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+      {quality?.missing_patterns?.per_item_missing &&
+        Object.keys(quality.missing_patterns.per_item_missing).length > 0 && (
+          <Card>
+            <CardContent className="p-5">
+              <h3 className="mb-4 font-medium text-gray-900">逐题缺失率</h3>
+              <div className="space-y-2">
+                {Object.entries(quality.missing_patterns.per_item_missing)
+                  .filter(([, v]) => v.rate > 0)
+                  .sort(([, a], [, b]) => b.rate - a.rate)
+                  .map(([qname, info]) => (
+                    <div key={qname} className="flex items-center gap-3">
+                      <span className="w-24 truncate text-xs font-mono text-muted-foreground">
+                        {qname}
+                      </span>
+                      <div className="flex-1 rounded-full bg-muted">
+                        <div
+                          className="h-2 rounded-full bg-blue-500"
+                          style={{ width: `${Math.min(info.rate * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-16 text-right text-xs tabular-nums">
+                        {(info.rate * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
       <Card>
         <CardContent className="p-5">

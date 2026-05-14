@@ -223,3 +223,199 @@ class TestResponseQuality:
         ]
         result = compute_response_quality(responses, questions)
         assert result["straightliner_count"] == 1
+
+
+# ── T9 Extended Quality Tests ────────────────────────────────────────────
+
+
+class TestMissingPatterns:
+    """Tests for compute_missing_patterns()."""
+
+    def test_missing_patterns_basic(self):
+        """Basic missing pattern detection."""
+        from app.core.analytics import compute_missing_patterns
+
+        questions = [
+            {"name": "q1", "title": "Q1", "type": "radiogroup"},
+            {"name": "q2", "title": "Q2", "type": "radiogroup"},
+            {"name": "q3", "title": "Q3", "type": "radiogroup"},
+        ]
+        answers = [
+            {"q1": "a", "q2": "b", "q3": "c"},  # Complete
+            {"q1": "a", "q2": None, "q3": "c"},  # Missing q2
+            {"q1": None, "q2": None, "q3": "c"},  # Missing q1 & q2
+            {"q1": "a", "q2": "b", "q3": None},  # Missing q3
+        ]
+
+        result = compute_missing_patterns(answers, questions)
+
+        # Per-item missing
+        assert result["per_item_missing"]["q1"]["count"] == 1
+        assert result["per_item_missing"]["q2"]["count"] == 2
+        assert result["per_item_missing"]["q3"]["count"] == 1
+
+        # Co-missing pairs: need at least 2 co-missing to appear
+        # q1 & q2 both missing in answers[2] (1 occurrence — below threshold)
+        # q2 & q3: q2 missing in answers[1], q3 missing in answers[3]
+        assert isinstance(result["co_missing_pairs"], list)
+        # Per-respondent distribution
+        assert sum(d["n_respondents"] for d in result["respondent_distribution"]) == 4
+
+    def test_missing_patterns_empty(self):
+        """Missing patterns with no responses."""
+        from app.core.analytics import compute_missing_patterns
+
+        result = compute_missing_patterns([], [{"name": "q1", "title": "Q1", "type": "radiogroup"}])
+        assert result["per_item_missing"] == {}
+        assert result["co_missing_pairs"] == []
+        assert result["respondent_distribution"] == []
+
+
+class TestInconsistencyDetection:
+    """Tests for compute_inconsistency_scores()."""
+
+    def test_inconsistency_detection(self):
+        """Detects contradictions between forward and reverse items."""
+        from app.core.analytics import compute_inconsistency_scores
+
+        questions = [
+            {"name": "f1", "title": "I feel satisfied", "type": "rating", "rateType": "labels"},
+            {"name": "f2", "title": "Life is good", "type": "rating", "rateType": "labels"},
+            {"name": "r1", "title": "I feel sad (Reverse)", "type": "rating", "rateType": "labels"},
+        ]
+        answers = [
+            {"f1": 5, "f2": 5, "r1": 1},  # Consistent (high forward, low reverse)
+            {"f1": 5, "f2": 4, "r1": 5},  # INCONSISTENT (high on both)
+        ]
+
+        result = compute_inconsistency_scores(answers, questions)
+        assert result["inconsistent_respondents"] == 1
+        assert result["inconsistency_rate"] == 0.5
+
+    def test_inconsistency_no_reverse_items(self):
+        """No inconsistency detection without reverse items."""
+        from app.core.analytics import compute_inconsistency_scores
+
+        questions = [
+            {"name": "f1", "title": "Not reversed", "type": "rating", "rateType": "labels"},
+        ]
+        answers = [{"f1": 5}]
+
+        result = compute_inconsistency_scores(answers, questions)
+        assert result["inconsistent_respondents"] == 0
+        assert result["inconsistency_rate"] == 0.0
+
+
+class TestAttentionCheck:
+    """Tests for compute_attention_check_performance()."""
+
+    def test_attention_check_pass(self):
+        """Attention check detection."""
+        from app.core.analytics import compute_attention_check_performance
+
+        questions = [
+            {"name": "ac1", "title": "Attention check", "type": "radiogroup",
+             "isAttentionCheck": True, "correctAnswer": "2"},
+            {"name": "q1", "title": "Normal question", "type": "radiogroup"},
+        ]
+        answers = [
+            {"ac1": "2", "q1": "a"},  # Pass
+            {"ac1": "1", "q1": "b"},  # Fail
+            {"ac1": "2", "q1": "c"},  # Pass
+        ]
+
+        result = compute_attention_check_performance(answers, questions)
+        assert result["attention_items"] == ["ac1"]
+        assert result["pass_count"] == 2
+        assert result["fail_count"] == 1
+        assert result["pass_rate"] == pytest.approx(66.7, abs=0.2)
+        assert len(result["failed_respondents"]) == 1
+
+    def test_attention_check_none_present(self):
+        """No attention checks in survey."""
+        from app.core.analytics import compute_attention_check_performance
+
+        questions = [
+            {"name": "q1", "title": "Normal", "type": "radiogroup"},
+        ]
+        answers = [{"q1": "a"}]
+
+        result = compute_attention_check_performance(answers, questions)
+        assert result["attention_items"] == []
+        assert result["pass_rate"] == 0.0
+
+
+class TestResponseTimeDistribution:
+    """Tests for compute_response_time_distribution()."""
+
+    def test_time_distribution(self):
+        """Response time distribution with known values."""
+        from app.core.analytics import compute_response_time_distribution
+
+        responses = [
+            {"metadata": {"completion_time_seconds": 10}},
+            {"metadata": {"completion_time_seconds": 20}},
+            {"metadata": {"completion_time_seconds": 30}},
+            {"metadata": {"completion_time_seconds": 40}},
+            {"metadata": {"completion_time_seconds": 50}},
+            {"metadata": {"completion_time_seconds": 60}},
+            {"metadata": {"completion_time_seconds": 70}},
+            {"metadata": {"completion_time_seconds": 80}},
+            {"metadata": {"completion_time_seconds": 90}},
+            {"metadata": {"completion_time_seconds": 100}},
+        ]
+
+        result = compute_response_time_distribution(responses)
+        q = result["quantiles"]
+        assert "p5" in q and "p50" in q and "p95" in q
+        # Quantile at position index for 10 elements
+        assert 40 <= q["p50"] <= 60  # Rough median check
+        assert result["fast_threshold"] > 0
+        assert result["slow_threshold"] > 0
+
+    def test_time_distribution_empty(self):
+        """Empty distribution returns zeros."""
+        from app.core.analytics import compute_response_time_distribution
+
+        result = compute_response_time_distribution([])
+        assert result["quantiles"] == {}
+        assert result["fast_respondents"] == 0
+
+
+class TestIntegratedQuality:
+    """Integration test for extended compute_response_quality()."""
+
+    def test_extended_quality_result(self):
+        """Extended response quality includes T9 fields."""
+        from app.core.analytics import compute_response_quality
+
+        questions = [
+            {"name": "q1", "title": "Q1 rev (Reverse)", "type": "rating", "rateType": "labels"},
+            {"name": "q2", "title": "Q2", "type": "rating", "rateType": "labels"},
+            {"name": "ac1", "title": "Attention", "type": "radiogroup",
+             "isAttentionCheck": True, "correctAnswer": "OK"},
+        ]
+        responses = [
+            {
+                "answers": {"q1": 5, "q2": 5, "ac1": "OK"},
+                "metadata": {"completion_time_seconds": 120},
+                "is_complete": True,
+            },
+            {
+                "answers": {"q1": 5, "q2": 4, "ac1": "WRONG"},
+                "metadata": {"completion_time_seconds": 10},
+                "is_complete": True,
+            },
+        ]
+
+        result = compute_response_quality(responses, questions)
+
+        # Core fields
+        assert result["total_responses"] == 2
+        assert result["complete_responses"] == 2
+
+        # T9 extended fields
+        assert "missing_patterns" in result
+        assert "inconsistency_rate" in result
+        assert "response_time_distribution" in result
+        assert "attention_check_pass_rate" in result

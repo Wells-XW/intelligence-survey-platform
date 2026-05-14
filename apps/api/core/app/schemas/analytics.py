@@ -99,7 +99,13 @@ class CrossTabResult(BaseModel):
 
 
 class ResponseQualityResult(BaseModel):
-    """Data quality diagnostics for survey responses."""
+    """Data quality diagnostics for survey responses.
+
+    Includes basic quality metrics (completion rate, speeders,
+    straightliners) and extended T9 metrics (missing patterns,
+    inconsistency detection, response time distribution, and
+    attention check performance).
+    """
 
     total_responses: int
     complete_responses: int
@@ -116,3 +122,24 @@ class ResponseQualityResult(BaseModel):
         default=None, description="Question name where most dropouts occurred"
     )
     dropout_count: int = 0
+    # T9 extended metrics
+    missing_patterns: Optional[dict] = Field(
+        default=None,
+        description="Missing pattern analysis: per-item rates, co-missing pairs, distribution",
+    )
+    inconsistency_rate: Optional[float] = Field(
+        default=None,
+        description="Rate of respondents with inconsistency between forward and reverse-coded items",
+    )
+    inconsistent_respondents: Optional[int] = Field(
+        default=None,
+        description="Number of respondents with response inconsistencies",
+    )
+    response_time_distribution: Optional[dict] = Field(
+        default=None,
+        description="Response time quantiles (P5/P25/P50/P75/P95)",
+    )
+    attention_check_pass_rate: Optional[float] = Field(
+        default=None,
+        description="Percentage of attention checks passed (0-100)",
+    )

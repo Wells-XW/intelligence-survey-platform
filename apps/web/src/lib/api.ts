@@ -193,6 +193,22 @@ export interface ResponseQualityResult {
   straightliner_count: number;
   dropout_question?: string | null;
   dropout_count: number;
+  // T9 extended metrics
+  missing_patterns?: {
+    per_item_missing: Record<string, { count: number; rate: number }>;
+    co_missing_pairs: Array<{ q1: string; q2: string; co_miss_count: number; rate: number }>;
+    respondent_distribution: Array<{ missing_count: number; n_respondents: number }>;
+  } | null;
+  inconsistency_rate?: number | null;
+  inconsistent_respondents?: number | null;
+  response_time_distribution?: {
+    quantiles: Record<string, number>;
+    fast_threshold: number;
+    slow_threshold: number;
+    fast_respondents: number;
+    slow_respondents: number;
+  } | null;
+  attention_check_pass_rate?: number | null;
 }
 
 export interface SurveyResponseListItem {
@@ -560,4 +576,87 @@ export function searchEntries(params: {
     if (v !== undefined) searchParams.set(k, String(v));
   });
   return api.get<KnowledgeEntrySearchResponse>(`/kb/entries?${searchParams.toString()}`);
+}
+
+// ── Ethics & Compliance Types ───────────────────────────────────────────
+
+export interface ComplianceFinding {
+  dimension: string;
+  issue: string;
+  severity: string;
+  evidence?: string | null;
+  reference?: string | null;
+}
+
+export interface ComplianceSuggestion {
+  priority: string;
+  title: string;
+  description: string;
+  reference?: string | null;
+}
+
+export interface ComplianceCheckResponse {
+  id: string;
+  survey_id: string;
+  check_type: string;
+  status: string;
+  risk_level: string;
+  risk_score: number;
+  findings: ComplianceFinding[];
+  suggestions: ComplianceSuggestion[];
+  items_checked: number;
+  items_passed: number;
+  items_warning: number;
+  items_failed: number;
+  checked_at: string;
+}
+
+export interface ComplianceHistoryResponse {
+  survey_id: string;
+  checks: ComplianceCheckResponse[];
+  latest_risk_score?: number | null;
+  latest_risk_level?: string | null;
+  total_checks: number;
+}
+
+export interface ComplianceReportResponse {
+  survey_id: string;
+  survey_title: string;
+  report_markdown: string;
+  risk_score: number;
+  risk_level: string;
+  generated_at: string;
+}
+
+export interface ComplianceScanRequest {
+  check_types?: string[] | null;
+  include_ai_review?: boolean;
+}
+
+// ── Ethics & Compliance API Helpers ────────────────────────────────────
+
+export function runComplianceScan(
+  surveyId: string,
+  body?: ComplianceScanRequest,
+): Promise<ComplianceCheckResponse> {
+  return api.post<ComplianceCheckResponse>(
+    `/surveys/${surveyId}/compliance/scan`,
+    body || {},
+  );
+}
+
+export function getComplianceReport(
+  surveyId: string,
+): Promise<ComplianceReportResponse> {
+  return api.get<ComplianceReportResponse>(
+    `/surveys/${surveyId}/compliance/report`,
+  );
+}
+
+export function getComplianceHistory(
+  surveyId: string,
+): Promise<ComplianceHistoryResponse> {
+  return api.get<ComplianceHistoryResponse>(
+    `/surveys/${surveyId}/compliance/history`,
+  );
 }
