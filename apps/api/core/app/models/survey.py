@@ -43,6 +43,9 @@ class Survey(Base):
     permissions = relationship(
         "SurveyPermission", back_populates="survey", cascade="all, delete-orphan"
     )
+    responses = relationship(
+        "SurveyResponse", back_populates="survey", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Survey(id={self.id}, title={self.title!r}, status={self.status!r})>"

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, MoreVertical, Trash2, Copy } from 'lucide-react';
+import { Plus, FileText, MoreVertical, Trash2, Copy, BarChart3, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, type SurveyListItem } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -189,9 +189,19 @@ function SurveyCard({
               <FileText className="mr-2 h-4 w-4" />
               编辑
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/survey/${survey.id}/analytics`)}>
+              <BarChart3 className="mr-2 h-4 w-4" />
+              分析
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                const fillUrl = `${window.location.origin}/survey/${survey.id}/fill`;
+                navigator.clipboard.writeText(fillUrl);
+                toast.success('填写链接已复制到剪贴板');
+              }}
+            >
               <Copy className="mr-2 h-4 w-4" />
-              复制
+              复制填写链接
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-red-600"

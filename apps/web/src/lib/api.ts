@@ -120,3 +120,86 @@ export interface UpdateSurveyRequest {
   json_content?: Record<string, unknown>;
   status?: string;
 }
+
+// ── Analytics Types ───────────────────────────────────────────────────
+
+export interface FrequencyItem {
+  value: string;
+  count: number;
+  percentage: number;
+}
+
+export interface NumericStats {
+  mean: number;
+  median: number;
+  mode: number[];
+  std_dev: number;
+  min_value: number;
+  max_value: number;
+  n: number;
+}
+
+export interface QuestionSummary {
+  question_name: string;
+  question_text: string;
+  question_type: string;
+  total_answers: number;
+  skipped: number;
+  frequencies?: FrequencyItem[] | null;
+  numeric_stats?: NumericStats | null;
+  word_cloud?: Record<string, unknown>[] | null;
+  top_texts?: string[] | null;
+}
+
+export interface SurveySummaryResponse {
+  survey_id: string;
+  survey_title: string;
+  total_responses: number;
+  complete_responses: number;
+  partial_responses: number;
+  questions: QuestionSummary[];
+}
+
+export interface CronbachAlphaResult {
+  scale_name: string;
+  items: string[];
+  n_items: number;
+  n_valid_responses: number;
+  alpha: number;
+  item_variances: Record<string, number>;
+  total_variance: number;
+  interpretation: string;
+}
+
+export interface CrossTabResult {
+  row_question: string;
+  col_question: string;
+  row_labels: string[];
+  col_labels: string[];
+  matrix: number[][];
+  chi_square?: number | null;
+  cramers_v?: number | null;
+  n: number;
+}
+
+export interface ResponseQualityResult {
+  total_responses: number;
+  complete_responses: number;
+  completion_rate: number;
+  avg_completion_seconds: number;
+  median_completion_seconds: number;
+  speeder_count: number;
+  speeder_threshold_seconds: number;
+  straightliner_count: number;
+  dropout_question?: string | null;
+  dropout_count: number;
+}
+
+export interface SurveyResponseListItem {
+  id: string;
+  survey_id: string;
+  respondent_id?: string | null;
+  is_complete: boolean;
+  completion_time_seconds?: number | null;
+  submitted_at: string;
+}

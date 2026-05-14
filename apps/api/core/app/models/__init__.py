@@ -3,6 +3,7 @@ from .consent_record import ConsentRecord
 from .refresh_token import RefreshToken
 from .survey import Survey
 from .survey_permission import SurveyPermission
+from .survey_response import SurveyResponse
 from .user import User
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "RefreshToken",
     "Survey",
     "SurveyPermission",
+    "SurveyResponse",
     "User",
 ]

@@ -1,5 +1,7 @@
 """Survey CRUD API endpoints with authentication and authorization."""
 
+from __future__ import annotations
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request

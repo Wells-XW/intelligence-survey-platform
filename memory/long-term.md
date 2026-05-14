@@ -12,11 +12,12 @@
   - AI: 多模型路由(DeepSeek-R1 中文主力 + Claude 英文 + GPT-4.5 mini 批量)
   - 存储: PostgreSQL 16 + Elasticsearch 9.x + Garage(对象存储, 替代MinIO) + Redis 7
   - 部署: Docker Compose(MVP) → Kubernetes(Phase 2+)
-- PHASE 1 四项任务已完成：
+- PHASE 1 五项任务已完成：
   1. ✅ 需求深入验证与用户访谈 (requirements-validation-report-v1)
   2. ✅ 竞品功能详细拆解与差距分析 (competitor-feature-gap-analysis-v1)
   3. ✅ 技术架构设计与技术选型决策 (technical-architecture-and-stack-decision-v1)
   4. ✅ 核心模块 MVP：问卷设计器开发 (2026-05-14 完成初始代码脚手架)
+  5. ✅ 数据安全与权限机制实现 (2026-05-14 完成五层安全架构)
 - 竞品验证核心结论：Qualtrics 贵且难用，SurveyMonkey 缺少学术模块，LimeSurvey 界面陈旧，问卷星功能全但无学术引导，空白市场确认存在
 - 差距分析核心发现：①AI+学术规范融合是全局空白 ②信效度检验内置是全局空白 ③PIPL合规是中文独有机会 ④学术个人$10-30/月定价区间完全空白 ⑤文献→问卷工作流无竞品实现
 - 四大差异化支柱：学术规范内置 + AI智能全流程 + 中文生态深度 + 可负担定价
@@ -44,3 +45,22 @@
 - CI: GitHub Actions (lint + type check + test)
 - TypeScript 编译零错误通过
 - 待完成: 实际 Docker Compose 启动验证（需 PostgreSQL 运行环境）
+
+## 2026-05-14 数据安全与权限机制实现
+- ✅ 五层安全架构完整实现，已推送至 GitHub (Wells-XW/intelligence-survey-platform)
+- 52 文件变更，~2,829 行新增代码
+- 安全层次:
+  1. **认证层**: JWT (access 15min + refresh 7d 一次性轮转)，bcrypt 密码哈希，注册/登录/刷新/me API
+  2. **授权层**: Survey-level RBAC (owner > editor > viewer)，SurveyPermission 表 JOIN 实现多租户数据隔离
+  3. **速率限制**: 内存滑动窗口限流器 (60 req/min/IP)，RateLimitMiddleware
+  4. **审计日志**: AuditLog 追加模型 (action, resource_type, resource_id, IP, user_agent)，关键操作全记录
+  5. **PIPL 合规**: ConsentRecord (注册时自动创建知情同意)，SurveyResponse 含 PIPL 合规说明
+- 后端新增文件: 15 (6 models + 3 core utilities + auth API + rate limit middleware + schemas + tests)
+- 后端修改文件: 6 (config, models/__init__, survey model, main.py, surveys router, schemas)
+- 前端新增文件: 7 (auth store + LoginPage + RegisterPage + AuthGuard + NavBar + AppLayout + auth API client)
+- 前端修改文件: 3 (api.ts JWT注入+401刷新, App.tsx 路由, main.tsx 初始化)
+- 测试: 4 文件 (conftest + test_security + test_auth + test_surveys_auth, 16+ test cases)
+- Python 3.9 兼容: 使用 `from __future__ import annotations` 支持现代类型提示
+- passlib + bcrypt 版本兼容: bcrypt 锁定在 >=4.0.0,<4.1.0（passlib 1.7.4 不兼容 bcrypt 5.x）
+- shadcn/ui 组件: 11 组件已安装 (button, input, card, label, separator, dropdown-menu, tooltip, sonner, skeleton + 新增)
+- 前端认证流: Zustand store → localStorage 持久化 → 401 自动 refresh → 失败时登出

@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.v1.analytics import router as analytics_router
 from .api.v1.auth import router as auth_router
 from .api.v1.health import router as health_router
+from .api.v1.responses import router as responses_router
 from .api.v1.surveys import router as surveys_router
 from .config import settings
 from .database import Base, engine
@@ -45,6 +47,8 @@ app.add_middleware(
 )
 
 # API Routes
+app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(responses_router, prefix="/api/v1")
 app.include_router(surveys_router, prefix="/api/v1")
