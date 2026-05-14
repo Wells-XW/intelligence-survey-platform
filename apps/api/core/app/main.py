@@ -9,10 +9,12 @@ from .api.v1.ai import router as ai_router
 from .api.v1.analytics import router as analytics_router
 from .api.v1.auth import router as auth_router
 from .api.v1.health import router as health_router
+from .api.v1.knowledge_base import router as kb_router
 from .api.v1.responses import router as responses_router
 from .api.v1.surveys import router as surveys_router
 from .config import settings
-from .database import Base, engine
+from .core.seed_data import seed_scales_and_entries
+from .database import Base, async_session, engine
 from .middleware.rate_limit import RateLimitMiddleware
 
 
@@ -22,6 +24,10 @@ async def lifespan(app: FastAPI):
     # Startup: create tables (for MVP; use Alembic in production)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Seed knowledge base with default scales and guides (idempotent)
+    async with async_session() as session:
+        await seed_scales_and_entries(session)
+        await session.commit()
     yield
     # Shutdown: dispose engine
     await engine.dispose()
@@ -52,5 +58,6 @@ app.include_router(ai_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(kb_router, prefix="/api/v1")
 app.include_router(responses_router, prefix="/api/v1")
 app.include_router(surveys_router, prefix="/api/v1")

@@ -365,3 +365,199 @@ export function generateSurveyStream(
   fetchStream();
   return controller;
 }
+
+// ── Knowledge Base Types ────────────────────────────────────────────────
+
+export interface LiteratureResult {
+  title: string;
+  authors: string[];
+  year?: number;
+  journal?: string;
+  abstract?: string;
+  doi?: string;
+  url?: string;
+  source: 'pubmed' | 'semantic_scholar' | 'cnki_web';
+  external_id?: string;
+  keywords?: string[];
+}
+
+export interface LiteratureSearchResponse {
+  results: LiteratureResult[];
+  total_count: number;
+  source: string;
+  query: string;
+  cached: boolean;
+}
+
+export interface ScaleItem {
+  code: string;
+  text: string;
+  reverse_scored: boolean;
+}
+
+export interface ScaleResponse {
+  id: string;
+  name: string;
+  discipline: string;
+  description?: string;
+  items?: ScaleItem[];
+  cronbach_alpha?: number;
+  cronbach_alpha_history?: Array<{ value: number; sample_n: number; year: number; citation: string }>;
+  citations?: Array<{ title: string; authors: string; year: number; doi: string }>;
+  language: string;
+  source_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScaleSearchResponse {
+  results: ScaleResponse[];
+  total_count: number;
+}
+
+export interface SavedReferenceResponse {
+  id: string;
+  title: string;
+  authors?: string[];
+  year?: number;
+  journal?: string;
+  abstract?: string;
+  doi?: string;
+  url?: string;
+  source: string;
+  external_id?: string;
+  keywords?: string[];
+  is_saved: boolean;
+  notes?: string;
+  created_at: string;
+}
+
+export interface SavedReferenceListResponse {
+  items: SavedReferenceResponse[];
+  total: number;
+}
+
+export interface KnowledgeEntryResponse {
+  id: string;
+  title: string;
+  category: string;
+  content?: Record<string, unknown>;
+  tags?: string[];
+  language: string;
+  created_at: string;
+}
+
+export interface KnowledgeEntrySearchResponse {
+  results: KnowledgeEntryResponse[];
+  total_count: number;
+}
+
+export interface AiAssistedSearchRequest {
+  topic: string;
+  research_question?: string;
+  include_literature?: boolean;
+  include_scales?: boolean;
+}
+
+export interface AiAssistedSearchResponse {
+  literature_findings: LiteratureResult[];
+  related_scales: ScaleResponse[];
+  ai_summary: string;
+  scales_ai_extracted?: Array<{ name: string; items: ScaleItem[] }>;
+  model_used: string;
+  tokens_used: number;
+}
+
+export interface ScaleImportResponse {
+  survey_id: string;
+  items_added: number;
+  survey_json: Record<string, unknown>;
+}
+
+// ── Knowledge Base API Helpers ──────────────────────────────────────────
+
+export function searchLiterature(params: {
+  query: string;
+  source?: string;
+  search_type?: string;
+  year_from?: number;
+  year_to?: number;
+  max_results?: number;
+}): Promise<LiteratureSearchResponse> {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined) searchParams.set(k, String(v));
+  });
+  return api.get<LiteratureSearchResponse>(`/kb/search/literature?${searchParams.toString()}`);
+}
+
+export function searchScales(params: {
+  query?: string;
+  discipline?: string;
+  language?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<ScaleSearchResponse> {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined) searchParams.set(k, String(v));
+  });
+  return api.get<ScaleSearchResponse>(`/kb/search/scales?${searchParams.toString()}`);
+}
+
+export function getSavedReferences(params: {
+  limit?: number;
+  offset?: number;
+}): Promise<SavedReferenceListResponse> {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined) searchParams.set(k, String(v));
+  });
+  return api.get<SavedReferenceListResponse>(`/kb/references?${searchParams.toString()}`);
+}
+
+export function saveReference(data: {
+  literature: LiteratureResult;
+  notes?: string;
+}): Promise<SavedReferenceResponse> {
+  return api.post<SavedReferenceResponse>('/kb/references', data);
+}
+
+export function deleteReference(id: string): Promise<void> {
+  return api.delete<void>(`/kb/references/${id}`);
+}
+
+export function aiAssistedSearch(
+  data: AiAssistedSearchRequest
+): Promise<AiAssistedSearchResponse> {
+  return api.post<AiAssistedSearchResponse>('/kb/search/ai-assisted', data);
+}
+
+export function importScaleToSurvey(
+  scaleId: string,
+  surveyId: string,
+  position: string = 'end'
+): Promise<ScaleImportResponse> {
+  return api.post<ScaleImportResponse>(`/kb/scales/${scaleId}/import`, {
+    survey_id: surveyId,
+    position,
+  });
+}
+
+export function getScaleDetail(scaleId: string): Promise<ScaleResponse> {
+  return api.get<ScaleResponse>(`/kb/scales/${scaleId}`);
+}
+
+export function searchEntries(params: {
+  query?: string;
+  category?: string;
+  language?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<KnowledgeEntrySearchResponse> {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined) searchParams.set(k, String(v));
+  });
+  return api.get<KnowledgeEntrySearchResponse>(`/kb/entries?${searchParams.toString()}`);
+}

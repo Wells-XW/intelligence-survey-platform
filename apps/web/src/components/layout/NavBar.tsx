@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, Sparkles, User } from 'lucide-react';
+import { BookOpen, GraduationCap, Library, LogOut, Sparkles, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -23,7 +23,7 @@ export function NavBar() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-surface">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
           <Link to="/" className="flex items-center gap-2 font-semibold text-lg">
             <span className="text-accent">ISP</span>
             <span className="hidden sm:inline">学术调查平台</span>
@@ -35,6 +35,28 @@ export function NavBar() {
             <Sparkles className="h-4 w-4" />
             <span className="hidden sm:inline">AI 生成</span>
           </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
+                <GraduationCap className="h-4 w-4" />
+                <span className="hidden sm:inline">知识库</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-40">
+              <DropdownMenuItem onClick={() => navigate('/kb/literature')}>
+                <BookOpen className="mr-2 h-4 w-4" />
+                文献检索
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/kb/scales')}>
+                <Library className="mr-2 h-4 w-4" />
+                量表库
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/kb/guides')}>
+                <GraduationCap className="mr-2 h-4 w-4" />
+                知识库
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <DropdownMenu>

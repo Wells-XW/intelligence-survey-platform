@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.3  # low temp for structured JSON output
     llm_request_timeout: int = 120  # seconds, generous for reasoning models
 
+    # Literature Search APIs (Phase 2 — Task 8)
+    pubmed_api_key: str = ""
+    pubmed_base_url: str = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+    semantic_scholar_api_key: str = ""
+    semantic_scholar_base_url: str = "https://api.semanticscholar.org/graph/v1"
+    literature_cache_ttl: int = 3600  # Redis cache TTL in seconds
+    literature_max_results: int = 20  # default max results per search
+    cnki_fallback_enabled: bool = False  # CNKI web scrape (fragile, best-effort)
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

@@ -145,3 +145,33 @@ async def check_survey_permission(
 
     _check_role(perm, min_role)
     return perm
+
+
+# ── Optional infrastructure dependencies ──────────────────────────────────
+
+from typing import Optional as _Optional
+
+import redis.asyncio as aioredis  # noqa: E402
+
+
+async def get_redis() -> _Optional[aioredis.Redis]:
+    """Yield an async Redis client, or ``None`` if Redis is unavailable.
+
+    Used for caching literature search results and other ephemeral data.
+    Gracefully degrades: callers should treat ``None`` as "cache miss"
+    rather than an error.
+    """
+    try:
+        client = aioredis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=2,
+        )
+        await client.ping()
+    except (aioredis.ConnectionError, OSError):
+        yield None
+    else:
+        try:
+            yield client
+        finally:
+            await client.close()
