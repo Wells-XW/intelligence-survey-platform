@@ -12,10 +12,11 @@
   - AI: 多模型路由(DeepSeek-R1 中文主力 + Claude 英文 + GPT-4.5 mini 批量)
   - 存储: PostgreSQL 16 + Elasticsearch 9.x + Garage(对象存储, 替代MinIO) + Redis 7
   - 部署: Docker Compose(MVP) → Kubernetes(Phase 2+)
-- PHASE 1 前三项任务已完成：
+- PHASE 1 四项任务已完成：
   1. ✅ 需求深入验证与用户访谈 (requirements-validation-report-v1)
   2. ✅ 竞品功能详细拆解与差距分析 (competitor-feature-gap-analysis-v1)
   3. ✅ 技术架构设计与技术选型决策 (technical-architecture-and-stack-decision-v1)
+  4. ✅ 核心模块 MVP：问卷设计器开发 (2026-05-14 完成初始代码脚手架)
 - 竞品验证核心结论：Qualtrics 贵且难用，SurveyMonkey 缺少学术模块，LimeSurvey 界面陈旧，问卷星功能全但无学术引导，空白市场确认存在
 - 差距分析核心发现：①AI+学术规范融合是全局空白 ②信效度检验内置是全局空白 ③PIPL合规是中文独有机会 ④学术个人$10-30/月定价区间完全空白 ⑤文献→问卷工作流无竞品实现
 - 四大差异化支柱：学术规范内置 + AI智能全流程 + 中文生态深度 + 可负担定价
@@ -27,9 +28,19 @@
 - 核心架构模式：双后端(FAST API核心+Fastify网关)、模块化单体(MVP)、SSE流式AI交互、PWA离线填写
 - LLM成本策略：DeepSeek-R1 成本仅为 GPT-4o 的 ~5%，中文质量更高，是核心优势
 
-
 ## 2026-05-14 自动提取
 - 技术架构选型决策文档已完成，存储于 outputs/technical-architecture-and-stack-decision-v1.md（约8000字）
 - API网关最终选用 Fastify（替代表Express），因2026年共识 Express 不适合新项目且 Fastify 快5倍
 - 对象存储选用 Garage（替代MinIO），因 MinIO 社区版移除管理控制台，Garage 轻量且 Apache 2.0 许可
--
+
+## 2026-05-14 问卷设计器开发进展
+- ✅ MVP 问卷设计器代码脚手架完成，已推送至 GitHub (Wells-XW/intelligence-survey-platform)
+- 代码结构: Monorepo (Turborepo + pnpm)，apps/web (前端) + apps/api/core (后端)
+- 前端: React 19.2.6 + Vite 8.x + TypeScript 6.x + Tailwind CSS 4.3 + shadcn/ui (Nova preset)
+- 前端核心依赖: SurveyJS Creator 2.5.24（免费开发/PoC，生产需 $589/dev 许可证）、React Router 7.15、Zustand 5.0.13、TanStack Query 5.100.10
+- 后端: FastAPI + SQLAlchemy async + asyncpg + alembic，Survey CRUD API 已实现
+- 数据库: PostgreSQL 16，survey 表使用 UUID 主键 + JSONB 存储问卷结构
+- 部署: Docker Compose 一键启动 (postgres + redis + api + web)
+- CI: GitHub Actions (lint + type check + test)
+- TypeScript 编译零错误通过
+- 待完成: 实际 Docker Compose 启动验证（需 PostgreSQL 运行环境）
