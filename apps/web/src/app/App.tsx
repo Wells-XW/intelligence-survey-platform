@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { SurveyListPage } from './pages/SurveyListPage';
 import { SurveyDesignerPage } from './pages/SurveyDesignerPage';
 import { AnalyticsDashboardPage } from './pages/AnalyticsDashboardPage';
+import { AiGenerationPage } from './pages/AiGenerationPage';
 import { SurveyFillPage } from './pages/SurveyFillPage';
 
 export function App() {
@@ -27,9 +28,10 @@ export function App() {
           }
         >
           <Route path="/" element={<SurveyListPage />} />
+          <Route path="/survey/new" element={<SurveyDesignerPage />} />
           <Route path="/survey/:id" element={<SurveyDesignerPage />} />
           <Route path="/survey/:id/analytics" element={<AnalyticsDashboardPage />} />
-          <Route path="/survey/new" element={<SurveyDesignerPage />} />
+          <Route path="/ai/generate" element={<AiGenerationPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

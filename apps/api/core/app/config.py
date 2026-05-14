@@ -23,6 +23,17 @@ class Settings(BaseSettings):
     # PIPL Region: cn | eu | global
     pipl_region: str = "cn"
 
+    # Redis / Celery
+    redis_url: str = "redis://localhost:6379/0"
+
+    # LLM / AI (Phase 2)
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"  # DeepSeek-V3 for structured JSON
+    llm_max_tokens: int = 4096
+    llm_temperature: float = 0.3  # low temp for structured JSON output
+    llm_request_timeout: int = 120  # seconds, generous for reasoning models
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

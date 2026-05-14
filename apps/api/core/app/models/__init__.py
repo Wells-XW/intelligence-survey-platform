@@ -1,3 +1,4 @@
+from .ai_generation_log import AiGenerationLog
 from .audit_log import AuditLog
 from .consent_record import ConsentRecord
 from .refresh_token import RefreshToken
@@ -7,6 +8,7 @@ from .survey_response import SurveyResponse
 from .user import User
 
 __all__ = [
+    "AiGenerationLog",
     "AuditLog",
     "ConsentRecord",
     "RefreshToken",

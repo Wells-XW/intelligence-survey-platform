@@ -46,12 +46,40 @@ services:
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 15
       JWT_REFRESH_TOKEN_EXPIRE_DAYS: 7
       PIPL_REGION: cn
+      # AI / LLM (Phase 2)
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      LLM_MAX_TOKENS: 4096
+      LLM_TEMPERATURE: "0.3"
+      LLM_REQUEST_TIMEOUT: "120"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./apps/api/core:/app  # Hot reload
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker — async AI generation tasks
+  celery-worker:
+    build:
+      context: ./apps/api/core
+    command: celery -A app.tasks worker --loglevel=info --concurrency=2
+    environment:
+      DATABASE_URL: postgresql+asyncpg://survey:survey@postgres:5432/survey_db
+      REDIS_URL: redis://redis:6379/0
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      LLM_MAX_TOKENS: 4096
+      LLM_TEMPERATURE: "0.3"
+      LLM_REQUEST_TIMEOUT: "120"
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./apps/api/core:/app
+    restart: unless-stopped
 
   # React Frontend (development)
   web:

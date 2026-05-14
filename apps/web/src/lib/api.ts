@@ -203,3 +203,165 @@ export interface SurveyResponseListItem {
   completion_time_seconds?: number | null;
   submitted_at: string;
 }
+
+// ── AI Generation Types ────────────────────────────────────────────────
+
+export interface AiGenerationRequest {
+  topic: string;
+  research_question: string;
+  target_population: string;
+  num_items?: number;
+  language?: 'zh' | 'en';
+  constructs?: string[];
+  existing_scales?: string[];
+  methodology_notes?: string;
+  survey_id?: string;
+}
+
+export interface AiCostEstimate {
+  estimated_tokens_input: number;
+  estimated_tokens_output: number;
+  estimated_cost_cents: number;
+  estimated_cost_rmb: number;
+  model: string;
+  provider: string;
+  is_low_cost: boolean;
+  message: string;
+}
+
+export interface SqpQualitySummary {
+  overall_quality: number;
+  total_items: number;
+  total_flags: number;
+  estimated_cronbach_alpha: number;
+  recommendation: string;
+  summary: string;
+}
+
+export interface AiGenerationMeta {
+  model: string;
+  provider: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  latency_ms: number;
+  estimated_cost_cents: number;
+  route_reasoning: string;
+}
+
+export interface AiGenerationResponse {
+  survey_json?: Record<string, unknown>;
+  sqp_report?: SqpQualitySummary;
+  meta: AiGenerationMeta;
+  success: boolean;
+  error?: string;
+}
+
+export interface SseProgressEvent {
+  stage: string;
+  message: string;
+  progress_pct: number;
+  data?: Record<string, unknown>;
+}
+
+// ── AI API Helpers ────────────────────────────────────────────────────
+
+export async function estimateAiCost(
+  req: AiGenerationRequest
+): Promise<AiCostEstimate> {
+  return api.post<AiCostEstimate>('/ai/estimate-cost', req);
+}
+
+export async function generateSurvey(
+  req: AiGenerationRequest
+): Promise<AiGenerationResponse> {
+  return api.post<AiGenerationResponse>('/ai/generate', req);
+}
+
+export function generateSurveyStream(
+  req: AiGenerationRequest,
+  onEvent: (event: SseProgressEvent) => void,
+  onError: (error: string) => void,
+  onComplete: (result: AiGenerationResponse) => void
+): AbortController {
+  const controller = new AbortController();
+  const token = useAuthStore.getState().accessToken;
+
+  const fetchStream = async () => {
+    try {
+      const response = await fetch('/api/v1/ai/generate/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(req),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: 'Stream error' }));
+        onError(err.detail || 'SSE 连接失败');
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        onError('浏览器不支持流式读取');
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        let eventType = '';
+        let eventData = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            eventData = line.slice(6).trim();
+          } else if (line === '' && eventData) {
+            try {
+              const parsed = JSON.parse(eventData) as SseProgressEvent;
+              onEvent(parsed);
+
+              if (eventType === 'done' && parsed.data) {
+                onComplete({
+                  success: true,
+                  survey_json: parsed.data.survey_json as Record<string, unknown>,
+                  sqp_report: parsed.data.sqp as SqpQualitySummary,
+                  meta: parsed.data.meta as AiGenerationMeta,
+                });
+                return;
+              }
+              if (eventType === 'error') {
+                onError(parsed.message);
+                return;
+              }
+            } catch {
+              // skip unparseable events
+            }
+            eventType = '';
+            eventData = '';
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      onError(err instanceof Error ? err.message : 'SSE 连接异常');
+    }
+  };
+
+  fetchStream();
+  return controller;
+}
