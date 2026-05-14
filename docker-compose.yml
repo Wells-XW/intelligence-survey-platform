@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  # PostgreSQL 16 — Primary database
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: survey
+      POSTGRES_PASSWORD: survey
+      POSTGRES_DB: survey_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U survey -d survey_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis 7 — Cache and task queue (Phase 2)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # FastAPI Core Backend
+  api:
+    build:
+      context: ./apps/api/core
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://survey:survey@postgres:5432/survey_db
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: http://localhost:5173
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/core:/app  # Hot reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # React Frontend (development)
+  web:
+    build:
+      context: ./apps/web
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    volumes:
+      - ./apps/web/src:/app/src  # Hot reload
+      - ./apps/web/index.html:/app/index.html
+    environment:
+      VITE_API_URL: http://localhost:8000
+
+volumes:
+  postgres_data:
+  redis_data:
