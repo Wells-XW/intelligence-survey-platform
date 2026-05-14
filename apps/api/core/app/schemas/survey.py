@@ -1,4 +1,10 @@
-"""Pydantic v2 schemas for Survey API."""
+"""Pydantic v2 schemas for Survey API.
+
+PIPL Compliance Note: When collecting personal information via survey
+JSON content, ensure data minimization principles are applied. Only
+collect data that is strictly necessary for the research purpose.
+See PRC Personal Information Protection Law, Articles 5-7.
+"""
 
 from datetime import datetime
 from typing import Optional
@@ -27,6 +33,7 @@ class SurveyResponse(BaseModel):
     """Full survey response including all fields."""
 
     id: str
+    owner_id: Optional[str] = None
     title: str
     description: Optional[str]
     json_content: dict

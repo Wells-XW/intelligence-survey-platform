@@ -14,10 +14,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
     cors_origins: str = "http://localhost:5173"
 
-    # JWT (for Phase 2 auth)
+    # JWT Auth
     jwt_secret: str = "dev-secret-change-me"
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 1440
+    jwt_access_token_expire_minutes: int = 15
+    jwt_refresh_token_expire_days: int = 7
 
     # PIPL Region: cn | eu | global
     pipl_region: str = "cn"

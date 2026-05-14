@@ -41,6 +41,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://survey:survey@postgres:5432/survey_db
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: http://localhost:5173
+      JWT_SECRET: dev-secret-change-me
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: 7
+      PIPL_REGION: cn
     depends_on:
       postgres:
         condition: service_healthy

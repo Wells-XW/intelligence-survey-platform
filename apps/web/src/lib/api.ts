@@ -1,3 +1,5 @@
+import { useAuthStore } from '@/features/auth/store';
+
 const BASE_URL = '/api/v1';
 
 interface ApiError {
@@ -6,15 +8,36 @@ interface ApiError {
 }
 
 class ApiClient {
+  private getAccessToken(): string | null {
+    return useAuthStore.getState().accessToken;
+  }
+
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const url = `${BASE_URL}${path}`;
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+    const token = this.getAccessToken();
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options?.headers as Record<string, string>),
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    let response = await fetch(url, {
       ...options,
+      headers,
     });
+
+    // Auto-refresh on 401
+    if (response.status === 401 && token) {
+      const newToken = await useAuthStore.getState().refreshAccessToken();
+      if (newToken) {
+        headers['Authorization'] = `Bearer ${newToken}`;
+        response = await fetch(url, { ...options, headers });
+      }
+    }
 
     if (!response.ok) {
       const error: ApiError = {
@@ -28,6 +51,11 @@ class ApiClient {
         // ignore parse error
       }
       throw error;
+    }
+
+    // 204 No Content
+    if (response.status === 204) {
+      return undefined as T;
     }
 
     return response.json();
@@ -61,6 +89,7 @@ export const api = new ApiClient();
 // Survey types (shared between frontend and backend)
 export interface Survey {
   id: string;
+  owner_id?: string | null;
   title: string;
   description: string | null;
   json_content: Record<string, unknown>;
@@ -89,4 +118,5 @@ export interface UpdateSurveyRequest {
   title?: string;
   description?: string;
   json_content?: Record<string, unknown>;
+  status?: string;
 }

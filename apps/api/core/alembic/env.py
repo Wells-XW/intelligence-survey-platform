@@ -7,7 +7,14 @@ from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.database import Base
-from app.models import Survey  # noqa: F401 — ensure models are loaded
+from app.models import (  # noqa: F401 — ensure all models are loaded
+    AuditLog,
+    ConsentRecord,
+    RefreshToken,
+    Survey,
+    SurveyPermission,
+    User,
+)
 
 config = context.config
 if config.config_file_name is not None:

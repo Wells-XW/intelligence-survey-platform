@@ -4,9 +4,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
 
@@ -18,6 +18,9 @@ class Survey(Base):
 
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    owner_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     title: Mapped[str] = mapped_column(String(500), nullable=False, default="未命名问卷")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -33,6 +36,12 @@ class Survey(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    owner = relationship("User", foreign_keys=[owner_id])
+    permissions = relationship(
+        "SurveyPermission", back_populates="survey", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

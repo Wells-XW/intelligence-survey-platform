@@ -5,7 +5,7 @@ import { Plus, FileText, MoreVertical, Trash2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, type SurveyListItem } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
