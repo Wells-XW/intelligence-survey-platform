@@ -13,8 +13,15 @@ from .api.v1.distribution import router as distribution_router
 from .api.v1.distribution import public_router as distribution_public_router
 from .api.v1.health import router as health_router
 from .api.v1.knowledge_base import router as kb_router
+from .api.v1.permissions import (
+    standalone_router as invitations_standalone_router,
+    survey_invitations_router,
+    survey_permissions_router,
+    user_search_router,
+)
 from .api.v1.responses import router as responses_router
 from .api.v1.surveys import router as surveys_router
+from .api.v1.versions import router as versions_router
 from .config import settings
 from .core.seed_data import seed_scales_and_entries
 from .database import Base, async_session, engine
@@ -67,3 +74,8 @@ app.include_router(distribution_public_router, prefix="/api/v1")
 app.include_router(distribution_router, prefix="/api/v1")
 app.include_router(responses_router, prefix="/api/v1")
 app.include_router(surveys_router, prefix="/api/v1")
+app.include_router(versions_router, prefix="/api/v1")
+app.include_router(survey_permissions_router, prefix="/api/v1")
+app.include_router(survey_invitations_router, prefix="/api/v1")
+app.include_router(invitations_standalone_router, prefix="/api/v1")
+app.include_router(user_search_router, prefix="/api/v1")

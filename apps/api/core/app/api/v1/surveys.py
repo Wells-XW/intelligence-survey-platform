@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,7 @@ from ...core.audit import log_audit
 from ...core.deps import check_survey_permission, get_current_user
 from ...database import get_db
 from ...models import Survey, SurveyPermission
+from ...models.survey_version import SurveyVersion
 from ...models.user import User
 from ...schemas.survey import (
     CreateSurveyRequest,
@@ -107,18 +109,49 @@ async def update_survey(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Update a survey. Requires editor or owner permission."""
+    """Update a survey. Requires editor or owner permission.
+
+    Optimistic-lock support: if ``expected_version`` is provided and
+    differs from the server version, a 409 Conflict is returned so the
+    client can reload and retry.
+
+    Each successful update creates an immutable ``SurveyVersion`` snapshot.
+    """
     sid = str(survey_id)
     await check_survey_permission(sid, user, "editor", db)
 
     result = await db.execute(select(Survey).where(Survey.id == sid))
     survey = result.scalar_one_or_none()
 
-    update_data = body.model_dump(exclude_unset=True)
+    # ── Optimistic lock check ──────────────────────────────────────
+    expected_version = body.expected_version
+    if expected_version is not None and expected_version != survey.version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"问卷已被其他用户修改（当前版本 v{survey.version}，"
+            f"你的版本 v{expected_version}）。请刷新后重试。",
+        )
+
+    # ── Apply updates ──────────────────────────────────────────────
+    update_data = body.model_dump(
+        exclude_unset=True, exclude={"expected_version"}
+    )
     for key, value in update_data.items():
         setattr(survey, key, value)
     survey.version += 1
 
+    # ── Create version snapshot ────────────────────────────────────
+    snapshot = SurveyVersion(
+        survey_id=sid,
+        version=survey.version,
+        json_content=deepcopy(survey.json_content),
+        title=survey.title,
+        description=survey.description,
+        creator_id=user.id,
+    )
+    db.add(snapshot)
+
+    # ── Audit ──────────────────────────────────────────────────────
     await log_audit(
         db,
         action="survey.update",

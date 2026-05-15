@@ -119,6 +119,179 @@ export interface UpdateSurveyRequest {
   description?: string;
   json_content?: Record<string, unknown>;
   status?: string;
+  expected_version?: number;  // optimistic lock
+}
+
+// ── Version History Types ──────────────────────────────────────────────
+
+export interface VersionListItem {
+  id: string;
+  version: number;
+  title: string;
+  creator_name: string | null;
+  creator_id: string | null;
+  changelog: string | null;
+  created_at: string;
+}
+
+export interface VersionDetail {
+  id: string;
+  version: number;
+  title: string;
+  description: string | null;
+  json_content: Record<string, unknown>;
+  creator_name: string | null;
+  creator_id: string | null;
+  changelog: string | null;
+  created_at: string;
+}
+
+export interface VersionDiffResponse {
+  from_version: VersionListItem;
+  to_version: VersionListItem;
+  diff_text: string;
+}
+
+// ── Collaboration Types ────────────────────────────────────────────────
+
+export interface PermissionDetail {
+  id: string;
+  user_id: string;
+  user_email: string;
+  user_display_name: string;
+  role: 'owner' | 'editor' | 'viewer';
+  created_at: string;
+}
+
+export interface InvitationResponse {
+  id: string;
+  survey_id: string;
+  email: string;
+  role: 'editor' | 'viewer';
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  token: string;
+  invite_url: string;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface InvitationAcceptResponse {
+  permission: PermissionDetail;
+  survey_title: string;
+  survey_id: string;
+}
+
+export interface UserSearchItem {
+  id: string;
+  email: string;
+  display_name: string;
+}
+
+// ── Version History API Helpers ────────────────────────────────────────
+
+export function getVersions(surveyId: string): Promise<VersionListItem[]> {
+  return api.get<VersionListItem[]>(`/surveys/${surveyId}/versions`);
+}
+
+export function getVersionDetail(
+  surveyId: string,
+  versionId: string,
+): Promise<VersionDetail> {
+  return api.get<VersionDetail>(`/surveys/${surveyId}/versions/${versionId}`);
+}
+
+export function restoreVersion(
+  surveyId: string,
+  versionId: string,
+  changelog?: string,
+): Promise<Survey> {
+  return api.post<Survey>(`/surveys/${surveyId}/versions/${versionId}/restore`, {
+    changelog,
+  });
+}
+
+export function diffVersions(
+  surveyId: string,
+  fromVersionId: string,
+  toVersionId: string,
+): Promise<VersionDiffResponse> {
+  return api.get<VersionDiffResponse>(
+    `/surveys/${surveyId}/versions/diff?from=${fromVersionId}&to=${toVersionId}`,
+  );
+}
+
+// ── Collaboration API Helpers ──────────────────────────────────────────
+
+export function getPermissions(
+  surveyId: string,
+): Promise<PermissionDetail[]> {
+  return api.get<PermissionDetail[]>(`/surveys/${surveyId}/permissions`);
+}
+
+export function grantPermission(
+  surveyId: string,
+  data: { user_id: string; role?: 'editor' | 'viewer' },
+): Promise<PermissionDetail> {
+  return api.post<PermissionDetail>(`/surveys/${surveyId}/permissions`, data);
+}
+
+export function updatePermissionRole(
+  surveyId: string,
+  permissionId: string,
+  data: { role: 'editor' | 'viewer' },
+): Promise<PermissionDetail> {
+  return api.put<PermissionDetail>(
+    `/surveys/${surveyId}/permissions/${permissionId}`,
+    data,
+  );
+}
+
+export function revokePermission(
+  surveyId: string,
+  permissionId: string,
+): Promise<void> {
+  return api.delete<void>(`/surveys/${surveyId}/permissions/${permissionId}`);
+}
+
+export function getInvitations(
+  surveyId: string,
+): Promise<InvitationResponse[]> {
+  return api.get<InvitationResponse[]>(`/surveys/${surveyId}/invitations`);
+}
+
+export function createInvitation(
+  surveyId: string,
+  data: { email: string; role?: 'editor' | 'viewer' },
+): Promise<InvitationResponse> {
+  return api.post<InvitationResponse>(
+    `/surveys/${surveyId}/invitations`,
+    data,
+  );
+}
+
+export function revokeInvitation(
+  surveyId: string,
+  invitationId: string,
+): Promise<void> {
+  return api.delete<void>(
+    `/surveys/${surveyId}/invitations/${invitationId}`,
+  );
+}
+
+export function lookupInvitation(
+  token: string,
+): Promise<InvitationResponse> {
+  return api.get<InvitationResponse>(`/invitations/${token}`);
+}
+
+export function acceptInvitation(
+  token: string,
+): Promise<InvitationAcceptResponse> {
+  return api.post<InvitationAcceptResponse>(`/invitations/${token}/accept`);
+}
+
+export function searchUsers(query: string): Promise<UserSearchItem[]> {
+  return api.get<UserSearchItem[]>(`/users/search?q=${encodeURIComponent(query)}`);
 }
 
 // ── Analytics Types ───────────────────────────────────────────────────

@@ -27,6 +27,11 @@ class UpdateSurveyRequest(BaseModel):
     description: Optional[str] = None
     json_content: Optional[dict] = None
     status: Optional[str] = None  # draft | published | closed
+    expected_version: Optional[int] = Field(
+        default=None,
+        description="Optimistic lock: client's expected version.  "
+        "409 Conflict if server version differs.",
+    )
 
 
 class SurveyResponse(BaseModel):

@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Save, Eye, Send, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Eye, Send, Share2, History, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, type Survey, type UpdateSurveyRequest } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { SurveyCreator } from '@/features/survey-designer/components/SurveyCreator';
+import {
+  SurveyCreator,
+  VersionHistoryPanel,
+  ShareDialog,
+  ConflictDialog,
+} from '@/features/survey-designer/components';
+import { useDesignerStore } from '@/features/survey-designer/store';
 
 function useSurvey(id: string) {
   return useQuery({
@@ -19,6 +25,8 @@ function useSurvey(id: string) {
 
 function useSaveSurvey(id: string) {
   const queryClient = useQueryClient();
+  const setConflictDialogOpen = useDesignerStore((s) => s.setConflictDialogOpen);
+  const setConflictInfo = useDesignerStore((s) => s.setConflictInfo);
 
   return useMutation({
     mutationFn: (data: UpdateSurveyRequest) => api.put<Survey>(`/surveys/${id}`, data),
@@ -27,8 +35,18 @@ function useSaveSurvey(id: string) {
       queryClient.invalidateQueries({ queryKey: ['surveys'] });
       toast.success('问卷已保存');
     },
-    onError: () => {
-      toast.error('保存失败，请重试');
+    onError: (err: { status?: number; detail?: string }) => {
+      if (err.status === 409) {
+        // Version conflict — open dialog
+        const match = err.detail?.match(/v(\d+).*v(\d+)/);
+        setConflictInfo({
+          expectedVersion: match ? parseInt(match[1]) : 0,
+          serverVersion: match ? parseInt(match[2]) : 0,
+        });
+        setConflictDialogOpen(true);
+      } else {
+        toast.error(err.detail || '保存失败，请重试');
+      }
     },
   });
 }
@@ -74,6 +92,8 @@ function SurveyDesignerEditor({ surveyId }: { surveyId: string }) {
   const [title, setTitle] = useState('');
   const [surveyJson, setSurveyJson] = useState<Record<string, unknown>>({});
   const isSavingRef = useRef(false);
+  const setShareDialogOpen = useDesignerStore((s) => s.setShareDialogOpen);
+  const setVersionPanelOpen = useDesignerStore((s) => s.setVersionPanelOpen);
 
   // Sync local state when survey loads
   useEffect(() => {
@@ -87,10 +107,14 @@ function SurveyDesignerEditor({ surveyId }: { surveyId: string }) {
     if (isSavingRef.current) return;
     isSavingRef.current = true;
     saveSurvey.mutate(
-      { title, json_content: surveyJson },
+      {
+        title,
+        json_content: surveyJson,
+        expected_version: survey?.version, // optimistic lock
+      },
       { onSettled: () => { isSavingRef.current = false; } },
     );
-  }, [title, surveyJson, saveSurvey]);
+  }, [title, surveyJson, survey, saveSurvey]);
 
   // Keyboard shortcut: Ctrl+S to save
   useEffect(() => {
@@ -145,6 +169,26 @@ function SurveyDesignerEditor({ surveyId }: { surveyId: string }) {
           保存
         </Button>
 
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setVersionPanelOpen(true)}
+          title="版本历史"
+        >
+          <History className="mr-2 h-4 w-4" />
+          版本
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShareDialogOpen(true)}
+          title="协作与分享"
+        >
+          <Share2 className="mr-2 h-4 w-4" />
+          分享
+        </Button>
+
         <Button variant="outline" size="sm">
           <Eye className="mr-2 h-4 w-4" />
           预览
@@ -163,6 +207,11 @@ function SurveyDesignerEditor({ surveyId }: { surveyId: string }) {
           onJsonChange={setSurveyJson}
         />
       </div>
+
+      {/* Dialogs */}
+      <VersionHistoryPanel surveyId={surveyId} />
+      <ShareDialog surveyId={surveyId} />
+      <ConflictDialog surveyId={surveyId} />
     </div>
   );
 }
