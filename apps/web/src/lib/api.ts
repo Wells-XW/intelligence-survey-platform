@@ -1103,3 +1103,155 @@ export function getDistributionDashboard(
     `/surveys/${surveyId}/distribution-dashboard`,
   );
 }
+
+// ── Psychometrics ────────────────────────────────────────────────────────
+
+export interface SplitHalfResult {
+  spearman_brown: number | null;
+  split_half_r: number | null;
+  method: string;
+  half1_items: string[];
+  half2_items: string[];
+  n_valid: number;
+  interpretation: string;
+  error?: string;
+}
+
+export interface ItemTotalItem {
+  item_name: string;
+  corrected_item_total_r: number;
+  alpha_if_deleted: number | null;
+  flag: string; // "good" | "moderate" | "weak"
+}
+
+export interface ItemTotalCorrelationResult {
+  items: ItemTotalItem[];
+  n_valid: number;
+  error?: string;
+}
+
+export interface KmoBartlettResult {
+  kmo_overall: number | null;
+  kmo_per_item: Record<string, number>;
+  bartlett_chi_square: number | null;
+  bartlett_df: number | null;
+  bartlett_p_value: number | null;
+  n_valid: number;
+  interpretation: string;
+  error?: string;
+}
+
+export interface ConstructDefinition {
+  name: string;
+  items: string[];
+}
+
+export interface ConstructPsychometric {
+  name: string;
+  n_items: number;
+  n_valid: number;
+  cronbach_alpha: number | null;
+  alpha_interpretation: string;
+  split_half: number | null;
+  item_total: ItemTotalItem[];
+}
+
+export interface InterConstructCorrelation {
+  construct_a: string;
+  construct_b: string;
+  correlation: number | null;
+}
+
+export interface ConstructPsychometricsResult {
+  constructs: ConstructPsychometric[];
+  inter_correlations: InterConstructCorrelation[];
+}
+
+export interface ReportSection {
+  title: string;
+  type: string; // "text" | "table" | "metric_card" | "comparison_table"
+  content: Record<string, unknown>;
+}
+
+export interface PsychometricReportResponse {
+  survey_id: string;
+  survey_title: string;
+  sections: ReportSection[];
+  generated_at: string;
+}
+
+export interface ScaleNormEntry {
+  scale_id: string;
+  scale_name: string;
+  discipline?: string;
+  published_alpha: number;
+  observed_alpha: number;
+  difference: number;
+  n_published?: number;
+  citation?: string;
+}
+
+export interface ReliabilityNormComparisonResult {
+  observed_alpha: number;
+  n_items: number;
+  n_valid: number;
+  comparison_scales: ScaleNormEntry[];
+  summary: string;
+}
+
+// API helpers
+
+export function getSplitHalf(
+  surveyId: string, items?: string, method?: string,
+): Promise<SplitHalfResult> {
+  const sp = new URLSearchParams();
+  if (items) sp.set('items', items);
+  if (method) sp.set('method', method);
+  return api.get<SplitHalfResult>(`/surveys/${surveyId}/psychometrics/split-half?${sp}`);
+}
+
+export function getItemTotal(
+  surveyId: string, items?: string,
+): Promise<ItemTotalCorrelationResult> {
+  const sp = new URLSearchParams();
+  if (items) sp.set('items', items);
+  return api.get<ItemTotalCorrelationResult>(`/surveys/${surveyId}/psychometrics/item-total?${sp}`);
+}
+
+export function getKmoBartlett(
+  surveyId: string, items?: string,
+): Promise<KmoBartlettResult> {
+  const sp = new URLSearchParams();
+  if (items) sp.set('items', items);
+  return api.get<KmoBartlettResult>(`/surveys/${surveyId}/psychometrics/kmo-bartlett?${sp}`);
+}
+
+export function analyzeConstructs(
+  surveyId: string, constructs: ConstructDefinition[],
+): Promise<ConstructPsychometricsResult> {
+  return api.post<ConstructPsychometricsResult>(
+    `/surveys/${surveyId}/psychometrics/constructs`,
+    { constructs },
+  );
+}
+
+export function getPsychometricReport(
+  surveyId: string, items?: string, includeConstructs?: string,
+): Promise<PsychometricReportResponse> {
+  const sp = new URLSearchParams();
+  if (items) sp.set('items', items);
+  if (includeConstructs) sp.set('include_constructs', includeConstructs);
+  return api.get<PsychometricReportResponse>(`/surveys/${surveyId}/psychometrics/report?${sp}`);
+}
+
+export function compareReliabilityNorms(
+  surveyId: string, items?: string, discipline?: string, language?: string,
+): Promise<ReliabilityNormComparisonResult> {
+  const sp = new URLSearchParams();
+  if (items) sp.set('items', items);
+  if (discipline) sp.set('discipline', discipline);
+  if (language) sp.set('language', language);
+  return api.get<ReliabilityNormComparisonResult>(
+    `/surveys/${surveyId}/psychometrics/norm-comparison?${sp}`,
+  );
+}

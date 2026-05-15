@@ -5,6 +5,7 @@ import {
   GraduationCap,
   Library,
   LogOut,
+  Ruler,
   Send,
   Shield,
   Sparkles,
@@ -88,6 +89,10 @@ export function NavBar() {
                 <DropdownMenuItem onClick={() => navigate(`/survey/${lastSurveyId}/analytics`)}>
                   <BarChart3 className="mr-2 h-4 w-4" />
                   数据质量
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(`/survey/${lastSurveyId}/measurement`)}>
+                  <Ruler className="mr-2 h-4 w-4" />
+                  测量工具箱
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate(`/survey/${lastSurveyId}/analytics/ethics`)}>
                   <Shield className="mr-2 h-4 w-4" />

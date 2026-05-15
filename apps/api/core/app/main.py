@@ -19,6 +19,7 @@ from .api.v1.permissions import (
     survey_permissions_router,
     user_search_router,
 )
+from .api.v1.psychometrics import router as psychometrics_router
 from .api.v1.responses import router as responses_router
 from .api.v1.surveys import router as surveys_router
 from .api.v1.versions import router as versions_router
@@ -72,6 +73,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(kb_router, prefix="/api/v1")
 app.include_router(distribution_public_router, prefix="/api/v1")
 app.include_router(distribution_router, prefix="/api/v1")
+app.include_router(psychometrics_router, prefix="/api/v1")
 app.include_router(responses_router, prefix="/api/v1")
 app.include_router(surveys_router, prefix="/api/v1")
 app.include_router(versions_router, prefix="/api/v1")

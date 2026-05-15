@@ -13,6 +13,7 @@ import LiteratureSearchPage from './pages/LiteratureSearchPage';
 import ScaleLibraryPage from './pages/ScaleLibraryPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import { SampleDistributionPage } from './pages/SampleDistributionPage';
+import { MeasurementToolkitPage } from './pages/MeasurementToolkitPage';
 
 export function App() {
   return (
@@ -38,6 +39,7 @@ export function App() {
           <Route path="/survey/:id/analytics" element={<AnalyticsDashboardPage />} />
           <Route path="/survey/:id/analytics/ethics" element={<EthicsCompliancePage />} />
           <Route path="/survey/:id/distribution" element={<SampleDistributionPage />} />
+          <Route path="/survey/:id/measurement" element={<MeasurementToolkitPage />} />
           <Route path="/ai/generate" element={<AiGenerationPage />} />
           <Route path="/kb/literature" element={<LiteratureSearchPage />} />
           <Route path="/kb/scales" element={<ScaleLibraryPage />} />
