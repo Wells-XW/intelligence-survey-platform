@@ -12,8 +12,12 @@ import {
   VersionHistoryPanel,
   ShareDialog,
   ConflictDialog,
+  CollaboratorAvatars,
+  QuestionLockOverlay,
 } from '@/features/survey-designer/components';
 import { useDesignerStore } from '@/features/survey-designer/store';
+import { useCollabSocket } from '@/features/survey-designer/hooks/useCollabSocket';
+import { useAuthStore } from '@/features/auth/store';
 
 function useSurvey(id: string) {
   return useQuery({
@@ -23,16 +27,44 @@ function useSurvey(id: string) {
   });
 }
 
-function useSaveSurvey(id: string) {
+function useSaveSurvey(id: string, getConnectionId: () => string | null) {
   const queryClient = useQueryClient();
   const setConflictDialogOpen = useDesignerStore((s) => s.setConflictDialogOpen);
   const setConflictInfo = useDesignerStore((s) => s.setConflictInfo);
 
   return useMutation({
-    mutationFn: (data: UpdateSurveyRequest) => api.put<Survey>(`/surveys/${id}`, data),
+    mutationFn: (data: UpdateSurveyRequest) => {
+      const connId = getConnectionId();
+      // Custom header lets the server skip our own ws broadcast.
+      // The shared ApiClient does not accept extra headers, so we use
+      // fetch directly here.  Auth comes from the same store.
+      return fetch(`/api/v1/surveys/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(connId ? { 'X-Collab-Connection-Id': connId } : {}),
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify(data),
+      }).then(async (res) => {
+        if (!res.ok) {
+          let detail = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            detail = body.detail || detail;
+          } catch {
+            /* ignore */
+          }
+          const err = { status: res.status, detail } as { status: number; detail: string };
+          throw err;
+        }
+        return res.json() as Promise<Survey>;
+      });
+    },
     onSuccess: (data) => {
       queryClient.setQueryData(['survey', id], data);
       queryClient.invalidateQueries({ queryKey: ['surveys'] });
+      queryClient.invalidateQueries({ queryKey: ['surveyVersions', id] });
       toast.success('问卷已保存');
     },
     onError: (err: { status?: number; detail?: string }) => {
@@ -49,6 +81,12 @@ function useSaveSurvey(id: string) {
       }
     },
   });
+}
+
+/** Pull access token from the auth store. */
+function getAuthHeader(): Record<string, string> {
+  const token = useAuthStore.getState().accessToken;
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export function SurveyDesignerPage() {
@@ -87,13 +125,20 @@ export function SurveyDesignerPage() {
 
 function SurveyDesignerEditor({ surveyId }: { surveyId: string }) {
   const { data: survey, isLoading } = useSurvey(surveyId);
-  const saveSurvey = useSaveSurvey(surveyId);
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [surveyJson, setSurveyJson] = useState<Record<string, unknown>>({});
   const isSavingRef = useRef(false);
   const setShareDialogOpen = useDesignerStore((s) => s.setShareDialogOpen);
   const setVersionPanelOpen = useDesignerStore((s) => s.setVersionPanelOpen);
+
+  // ── Real-time collaboration socket ───────────────────────────────
+  const socketRef = useCollabSocket(surveyId);
+  const getConnectionId = useCallback(
+    () => socketRef.current?.getConnectionId() ?? null,
+    [socketRef],
+  );
+  const saveSurvey = useSaveSurvey(surveyId, getConnectionId);
 
   // Sync local state when survey loads
   useEffect(() => {
@@ -102,6 +147,22 @@ function SurveyDesignerEditor({ surveyId }: { surveyId: string }) {
       setSurveyJson(survey.json_content || { pages: [] });
     }
   }, [survey]);
+
+  // Tell the server which question we're focused on.
+  const handleSelectedQuestionChange = useCallback(
+    (questionId: string | null) => {
+      socketRef.current?.acquireFocus(questionId);
+    },
+    [socketRef],
+  );
+
+  // Release focus on unmount so collaborators see the lock disappear
+  // immediately instead of waiting for the 60s TTL.
+  useEffect(() => {
+    return () => {
+      socketRef.current?.releaseFocus();
+    };
+  }, [socketRef]);
 
   const handleSave = useCallback(() => {
     if (isSavingRef.current) return;
@@ -155,6 +216,10 @@ function SurveyDesignerEditor({ surveyId }: { surveyId: string }) {
 
         <div className="flex-1" />
 
+        <CollaboratorAvatars />
+
+        <Separator orientation="vertical" className="h-6" />
+
         <Button
           variant="outline"
           size="sm"
@@ -201,11 +266,13 @@ function SurveyDesignerEditor({ surveyId }: { surveyId: string }) {
       </header>
 
       {/* Editor */}
-      <div className="flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden">
         <SurveyCreator
           surveyJson={surveyJson}
           onJsonChange={setSurveyJson}
+          onSelectedQuestionChange={handleSelectedQuestionChange}
         />
+        <QuestionLockOverlay />
       </div>
 
       {/* Dialogs */}
