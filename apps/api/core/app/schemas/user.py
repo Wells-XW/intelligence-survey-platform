@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class UserResponse(BaseModel):
@@ -14,4 +14,17 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "a1b2c3d4-e5f6-4789-90ab-cdef01234567",
+                    "email": "researcher@example.edu",
+                    "display_name": "李雪松",
+                    "is_active": True,
+                    "created_at": "2026-09-01T08:00:00Z",
+                }
+            ]
+        },
+    )

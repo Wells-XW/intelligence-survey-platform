@@ -26,6 +26,10 @@ from ...schemas.response import (
     SurveyResponseListItem,
     SurveyResponseOut,
 )
+from ...services.webhook_emitter import (
+    emit_webhook_event,
+    enqueue_webhook_deliveries,
+)
 
 router = APIRouter(prefix="/surveys", tags=["responses"])
 
@@ -34,6 +38,16 @@ router = APIRouter(prefix="/surveys", tags=["responses"])
     "/{survey_id}/responses",
     response_model=SurveyResponseOut,
     status_code=201,
+    summary="Submit a survey response",
+    description=(
+        "Submit one survey response. The endpoint is unauthenticated "
+        "to support anonymous respondents; the survey must be in "
+        "``published`` status. The ``metadata`` payload must include "
+        "``pipl_consent: true`` per PIPL Article 18, and the "
+        "client's IP is stored with the last octet zeroed for "
+        "anonymization. Emits ``response.created`` and (when "
+        "``is_complete=true``) ``response.completed`` webhook events."
+    ),
 )
 async def submit_response(
     survey_id: UUID,
@@ -85,8 +99,40 @@ async def submit_response(
         is_complete=body.is_complete,
     )
     db.add(response)
+    await db.flush()
+    await db.refresh(response)
+
+    # Emit domain events for webhook fan-out. Deliveries are inserted
+    # in the same transaction so a downstream rollback removes them
+    # cleanly; Celery enqueue happens only after commit succeeds.
+    submitted_at_iso = (
+        response.submitted_at.isoformat() if response.submitted_at else None
+    )
+    delivery_ids = await emit_webhook_event(
+        db,
+        event_type="response.created",
+        survey_id=sid,
+        payload={
+            "survey_id": sid,
+            "response_id": str(response.id),
+            "submitted_at": submitted_at_iso,
+        },
+    )
+    if body.is_complete:
+        delivery_ids += await emit_webhook_event(
+            db,
+            event_type="response.completed",
+            survey_id=sid,
+            payload={
+                "survey_id": sid,
+                "response_id": str(response.id),
+                "submitted_at": submitted_at_iso,
+            },
+        )
+
     await db.commit()
     await db.refresh(response)
+    enqueue_webhook_deliveries(delivery_ids)
 
     # If respondent_id corresponds to a Recipient, update recipient status
     # and increment matching quotas (sample distribution integration)
@@ -102,14 +148,26 @@ async def submit_response(
             recipient.status = "completed"
             recipient.completed_at = datetime.now(timezone.utc)
             db.add(recipient)
-            # Update matching quotas
-            await update_quota_on_response(db, body.respondent_id, sid)
+            # Update matching quotas; this may emit quota.reached events.
+            quota_delivery_ids = await update_quota_on_response(
+                db, body.respondent_id, sid
+            )
             await db.commit()
+            enqueue_webhook_deliveries(quota_delivery_ids)
 
     return SurveyResponseOut.model_validate(response)
 
 
-@router.get("/{survey_id}/responses", response_model=list[SurveyResponseListItem])
+@router.get(
+    "/{survey_id}/responses",
+    response_model=list[SurveyResponseListItem],
+    summary="List responses for a survey",
+    description=(
+        "Return responses for one survey, newest-first, paginated by "
+        "``offset`` and ``limit`` (page size capped at 1000). Caller "
+        "must hold at least viewer permission on the survey."
+    ),
+)
 async def list_responses(
     survey_id: UUID,
     limit: int = Query(default=100, ge=1, le=1000),
@@ -132,7 +190,16 @@ async def list_responses(
     return [SurveyResponseListItem.from_orm_row(r) for r in rows]
 
 
-@router.get("/{survey_id}/responses/{response_id}", response_model=SurveyResponseOut)
+@router.get(
+    "/{survey_id}/responses/{response_id}",
+    response_model=SurveyResponseOut,
+    summary="Get a single response",
+    description=(
+        "Return one response by id, including the full ``answers`` "
+        "payload and submission metadata. Caller must hold at least "
+        "viewer permission on the parent survey."
+    ),
+)
 async def get_response(
     survey_id: UUID,
     response_id: UUID,
@@ -157,7 +224,17 @@ async def get_response(
     return SurveyResponseOut.model_validate(response)
 
 
-@router.delete("/{survey_id}/responses", status_code=204)
+@router.delete(
+    "/{survey_id}/responses",
+    status_code=204,
+    summary="Delete all responses for a survey",
+    description=(
+        "Bulk-delete every response row for one survey. Restricted "
+        "to the survey owner because the operation is destructive "
+        "and irreversible. Emits a single ``responses.bulk_delete`` "
+        "audit row carrying the deleted-count."
+    ),
+)
 async def delete_all_responses(
     survey_id: UUID,
     request: Request,
@@ -193,7 +270,19 @@ async def delete_all_responses(
     await db.commit()
 
 
-@router.get("/{survey_id}/responses/export")
+@router.get(
+    "/{survey_id}/responses/export",
+    summary="Export responses as CSV or XLSX",
+    description=(
+        "Stream survey responses as a downloadable CSV file. The "
+        "``format`` query parameter is reserved for future XLSX "
+        "support; both values currently emit CSV with a flattened "
+        "header (``response_id``, ``respondent_id``, ``submitted_at``, "
+        "``is_complete``, plus one column per question). For "
+        "asynchronous multi-format exports use the "
+        "``/api/v1/exports`` endpoint family instead."
+    ),
+)
 async def export_responses(
     survey_id: UUID,
     format: str = Query(default="csv", pattern="^(csv|xlsx)$"),

@@ -28,7 +28,17 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post(
-    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new user account",
+    description=(
+        "Create a new platform user. Validates email uniqueness, "
+        "hashes the password with bcrypt, and records a "
+        "``privacy_policy`` consent row per PIPL Article 14. The "
+        "endpoint is unauthenticated; it is rate-limited at the "
+        "edge."
+    ),
 )
 async def register(
     body: RegisterRequest,
@@ -80,7 +90,17 @@ async def register(
     return user
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="Authenticate and obtain a token pair",
+    description=(
+        "Exchange email and password (sent as OAuth2 form fields, "
+        "where ``username`` is the email) for a fresh access and "
+        "refresh token pair. The refresh token is stored hashed "
+        "server-side so it can be revoked on reuse detection."
+    ),
+)
 async def login(
     request: Request,
     form: OAuth2PasswordRequestForm = Depends(),
@@ -153,7 +173,18 @@ async def login(
     )
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="Refresh an access token via one-use rotation",
+    description=(
+        "Exchange a still-valid refresh token for a fresh token "
+        "pair. The presented refresh token is invalidated atomically "
+        "with the new pair's issuance, so any second use of the "
+        "same refresh token is treated as replay and revokes every "
+        "outstanding refresh token for the user."
+    ),
+)
 async def refresh(
     body: RefreshRequest,
     request: Request,
@@ -242,7 +273,17 @@ async def refresh(
     )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get the current authenticated user's profile",
+    description=(
+        "Return the profile of the currently authenticated user. "
+        "Useful for hydrating the front-end session after a page "
+        "reload and for confirming token validity without a "
+        "side-effect-bearing call."
+    ),
+)
 async def me(user: User = Depends(get_current_user)):
     """Return the currently authenticated user's profile."""
     return user

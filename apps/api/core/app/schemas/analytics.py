@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ── Descriptive Statistics ────────────────────────────────────────────
@@ -58,6 +58,38 @@ class SurveySummaryResponse(BaseModel):
     partial_responses: int
     questions: list[QuestionSummary]
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "survey_id": "d3b07384-d9a8-4f3b-9f1e-6c2a4d2c8a11",
+                    "survey_title": "学术诚信认知调查（2026春）",
+                    "total_responses": 312,
+                    "complete_responses": 287,
+                    "partial_responses": 25,
+                    "questions": [
+                        {
+                            "question_name": "q1",
+                            "question_text": "整体而言，您对当前学术诚信制度的满意度如何？",
+                            "question_type": "rating",
+                            "total_answers": 287,
+                            "skipped": 0,
+                            "numeric_stats": {
+                                "mean": 3.42,
+                                "median": 3.0,
+                                "mode": [4.0],
+                                "std_dev": 0.91,
+                                "min_value": 1.0,
+                                "max_value": 5.0,
+                                "n": 287,
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
 
 # ── Reliability Analysis ──────────────────────────────────────────────
 
@@ -78,6 +110,29 @@ class CronbachAlphaResult(BaseModel):
         "Good (0.8-0.9), Excellent (>0.9)"
     )
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "scale_name": "学术诚信认知（5题）",
+                    "items": ["q1", "q2", "q3", "q4", "q5"],
+                    "n_items": 5,
+                    "n_valid_responses": 280,
+                    "alpha": 0.83,
+                    "item_variances": {
+                        "q1": 0.84,
+                        "q2": 0.91,
+                        "q3": 0.78,
+                        "q4": 0.95,
+                        "q5": 0.88,
+                    },
+                    "total_variance": 12.4,
+                    "interpretation": "Good (0.8-0.9)",
+                }
+            ]
+        }
+    )
+
 
 # ── Cross-Tabulation ──────────────────────────────────────────────────
 
@@ -93,6 +148,23 @@ class CrossTabResult(BaseModel):
     chi_square: Optional[float] = None
     cramers_v: Optional[float] = None
     n: int
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "row_question": "gender",
+                    "col_question": "agree_with_policy",
+                    "row_labels": ["女", "男", "其他"],
+                    "col_labels": ["同意", "中立", "不同意"],
+                    "matrix": [[58, 22, 14], [44, 31, 19], [3, 1, 0]],
+                    "chi_square": 5.71,
+                    "cramers_v": 0.13,
+                    "n": 192,
+                }
+            ]
+        }
+    )
 
 
 # ── Response Quality ──────────────────────────────────────────────────
@@ -142,4 +214,37 @@ class ResponseQualityResult(BaseModel):
     attention_check_pass_rate: Optional[float] = Field(
         default=None,
         description="Percentage of attention checks passed (0-100)",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "total_responses": 312,
+                    "complete_responses": 287,
+                    "completion_rate": 91.99,
+                    "avg_completion_seconds": 184.3,
+                    "median_completion_seconds": 162.5,
+                    "speeder_count": 11,
+                    "speeder_threshold_seconds": 54.2,
+                    "straightliner_count": 7,
+                    "dropout_question": "q14",
+                    "dropout_count": 18,
+                    "missing_patterns": {
+                        "per_item_rate": {"q3": 0.04, "q14": 0.18},
+                        "co_missing": [["q12", "q13"]],
+                    },
+                    "inconsistency_rate": 3.5,
+                    "inconsistent_respondents": 11,
+                    "response_time_distribution": {
+                        "p5": 62.0,
+                        "p25": 132.0,
+                        "p50": 162.5,
+                        "p75": 218.0,
+                        "p95": 401.0,
+                    },
+                    "attention_check_pass_rate": 96.4,
+                }
+            ]
+        }
     )

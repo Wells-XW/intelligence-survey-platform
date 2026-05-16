@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.recipient import Recipient
 from ..models.quota import Quota
 from ..models.sample_group import SampleGroup
+from .webhook_emitter import emit_webhook_event
 
 
 # ── CSV Import ──────────────────────────────────────────────────────────
@@ -177,20 +178,29 @@ async def match_recipient_from_token(
 
 async def update_quota_on_response(
     db: AsyncSession, recipient_id: str, survey_id: str
-) -> None:
+) -> list[str]:
     """When a recipient completes a survey, check and increment matching quotas.
 
     For each active quota on the survey that is not yet full, check whether
     the recipient's demographics satisfy the quota criteria. If so, increment
-    ``current_count``.
+    ``current_count``. When that increment causes ``current_count`` to reach
+    ``target_count`` for the first time, emit a ``quota.reached`` webhook
+    event.
+
+    The function does not commit; it flushes the new ``WebhookDelivery``
+    rows so the caller can enqueue Celery tasks for them after committing
+    the surrounding transaction. Returns the list of newly created
+    ``WebhookDelivery`` ids (possibly empty).
     """
+    delivery_ids: list[str] = []
+
     # Fetch recipient demographics
     result = await db.execute(
         select(Recipient).where(Recipient.id == recipient_id)
     )
     recipient = result.scalar_one_or_none()
     if not recipient or not recipient.demographics:
-        return
+        return delivery_ids
 
     # Fetch active, non-full quotas for this survey
     result = await db.execute(
@@ -206,6 +216,27 @@ async def update_quota_on_response(
         if _demographics_match(recipient.demographics, quota.criteria):
             quota.current_count += 1
             db.add(quota)
+            # Emit quota.reached on the transition into "full". The
+            # database guard (current_count < target_count above)
+            # ensures we only ever cross this boundary once per quota.
+            if quota.current_count >= quota.target_count:
+                ids = await emit_webhook_event(
+                    db,
+                    event_type="quota.reached",
+                    survey_id=quota.survey_id,
+                    payload={
+                        "survey_id": quota.survey_id,
+                        "quota_id": quota.id,
+                        "quota_name": quota.name,
+                        "dimension": quota.dimension,
+                        "target_count": quota.target_count,
+                        "current_count": quota.current_count,
+                        "filled_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                delivery_ids.extend(ids)
+
+    return delivery_ids
 
 
 def _demographics_match(recipient_demo: dict, quota_criteria: dict) -> bool:

@@ -1,10 +1,18 @@
 """Application configuration loaded from environment variables."""
 
+from typing import Tuple
+
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Application settings with defaults for local development."""
+    """Application settings with defaults for local development.
+
+    All fields use ``snake_case`` Python attribute names; Pydantic Settings
+    matches them against the corresponding ``UPPER_SNAKE_CASE`` environment
+    variables (e.g. ``rate_limit_default_per_minute`` reads from
+    ``RATE_LIMIT_DEFAULT_PER_MINUTE``) thanks to case-insensitive resolution.
+    """
 
     # Database
     database_url: str = "postgresql+asyncpg://survey:survey@localhost:5432/survey_db"
@@ -42,6 +50,41 @@ class Settings(BaseSettings):
     literature_cache_ttl: int = 3600  # Redis cache TTL in seconds
     literature_max_results: int = 20  # default max results per search
     cnki_fallback_enabled: bool = False  # CNKI web scrape (fragile, best-effort)
+
+    # ------------------------------------------------------------------
+    # T15 — API Open Platform and Export Enhancement
+    # ------------------------------------------------------------------
+    # Per-API-key rate limit defaults (Requirement 6.5). Applied when an
+    # ApiKey row has no entry in its ``rate_limit_overrides`` JSONB column.
+    rate_limit_default_per_minute: int = 60
+    rate_limit_default_per_hour: int = 1200
+    rate_limit_default_per_day: int = 10000
+
+    # Export pipeline storage and retention (Requirement 5.12).
+    # ``export_storage_root`` is project-relative; the export worker creates
+    # one subdirectory per (user_id, job_id) under this root and stores the
+    # materialized file plus a temp file used by the atomic rename.
+    export_storage_root: str = "storage/exports"
+    export_retention_hours: int = 168  # 7 days
+    export_download_token_ttl_seconds: int = 900  # 15 minutes
+
+    # Webhook delivery worker tunables (Requirement 4.5).
+    # The retry schedule is consumed by ``webhook_tasks.deliver_webhook`` and
+    # indexed by the delivery row's ``attempt_count`` rather than by Celery's
+    # ``self.request.retries`` so worker restarts cannot lose state.
+    webhook_delivery_timeout_seconds: int = 10
+    webhook_retry_schedule_seconds: Tuple[int, int, int, int, int] = (
+        60,
+        300,
+        1800,
+        7200,
+        43200,
+    )
+
+    # API key hygiene (Requirement 2.9). Used by the list endpoint to compute
+    # the ``inactive`` flag from ``last_used_at`` (or ``created_at`` if the
+    # key has never been used).
+    api_key_inactivity_threshold_days: int = 90
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

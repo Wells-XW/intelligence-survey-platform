@@ -40,7 +40,19 @@ async def _get_creator_name(db: AsyncSession, creator_id: Optional[str]) -> Opti
     return user.display_name if user else None
 
 
-@router.get("", response_model=list[VersionListItem])
+@router.get(
+    "",
+    response_model=list[VersionListItem],
+    summary="List a survey's saved versions",
+    description=(
+        "Return the version history of one survey, newest-first. Each "
+        "item carries metadata (version number, title, creator, "
+        "changelog, timestamp) but not the full snapshot body — fetch "
+        "``GET /{version_id}`` to retrieve the snapshot content. "
+        "Pagination via ``offset`` and ``limit``; caller must hold at "
+        "least viewer permission on the survey."
+    ),
+)
 async def list_versions(
     survey_id: UUID,
     limit: int = Query(default=20, ge=1, le=100),
@@ -79,7 +91,18 @@ async def list_versions(
     return items
 
 
-@router.get("/{version_id}", response_model=VersionDetail)
+@router.get(
+    "/{version_id}",
+    response_model=VersionDetail,
+    summary="Get a single version snapshot",
+    description=(
+        "Return the full snapshot of one saved version, including "
+        "the immutable ``json_content`` payload, title, description, "
+        "and changelog. Use this when previewing a version before a "
+        "restore, or when diffing arbitrary content client-side. "
+        "Caller must hold at least viewer permission on the survey."
+    ),
+)
 async def get_version(
     survey_id: UUID,
     version_id: UUID,
@@ -109,7 +132,18 @@ async def get_version(
     )
 
 
-@router.post("/{version_id}/restore", response_model=SurveyResponse)
+@router.post(
+    "/{version_id}/restore",
+    response_model=SurveyResponse,
+    summary="Restore a survey to a previous version",
+    description=(
+        "Roll one survey back to the snapshot identified by "
+        "``version_id``. Before applying the snapshot, the current "
+        "state is captured as a fresh version so the restore itself "
+        "is reversible. Emits a ``survey.version.restore`` audit "
+        "row. Caller must hold editor permission on the survey."
+    ),
+)
 async def restore_version(
     survey_id: UUID,
     version_id: UUID,
@@ -191,7 +225,18 @@ async def restore_version(
     return SurveyResponse.model_validate(survey)
 
 
-@router.get("/diff", response_model=VersionDiffResponse)
+@router.get(
+    "/diff",
+    response_model=VersionDiffResponse,
+    summary="Compute a unified diff between two versions",
+    description=(
+        "Return a unified text diff between any two saved versions "
+        "of the same survey. Both versions are pretty-printed as "
+        "JSON before diffing so reviewers can read field-level "
+        "changes inline. Caller must hold at least viewer permission "
+        "on the survey."
+    ),
+)
 async def diff_versions(
     survey_id: UUID,
     from_version: UUID = Query(..., alias="from"),

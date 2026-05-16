@@ -84,7 +84,19 @@ async def _get_analytics_data(
 # ── Summary Endpoint ──────────────────────────────────────────────────
 
 
-@router.get("/{survey_id}/analytics/summary", response_model=SurveySummaryResponse)
+@router.get(
+    "/{survey_id}/analytics/summary",
+    response_model=SurveySummaryResponse,
+    summary="Get full descriptive analytics for a survey",
+    description=(
+        "Compute one-shot descriptive statistics for every question "
+        "on the survey: frequency tables for categorical and "
+        "boolean items, mean/SD/min/max for numeric items, and a "
+        "top-text preview for free-text items. Considers only "
+        "complete responses. Caller must hold at least viewer "
+        "permission."
+    ),
+)
 async def get_analytics_summary(
     survey_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -151,6 +163,15 @@ async def get_analytics_summary(
 @router.get(
     "/{survey_id}/analytics/reliability",
     response_model=list[CronbachAlphaResult],
+    summary="Compute Cronbach's alpha for Likert items",
+    description=(
+        "Compute Cronbach's alpha for a set of Likert items. When "
+        "``scale_items`` is supplied, alpha is computed on those "
+        "named items; otherwise the endpoint auto-detects every "
+        "rating-type question on the survey. Returns the alpha, "
+        "valid-N, item variances, and an interpretation band per "
+        "the standard 0.6/0.7/0.8 thresholds."
+    ),
 )
 async def get_reliability(
     survey_id: UUID,
@@ -205,7 +226,18 @@ async def get_reliability(
 # ── Cross-Tab Endpoint ────────────────────────────────────────────────
 
 
-@router.get("/{survey_id}/analytics/cross-tab", response_model=CrossTabResult)
+@router.get(
+    "/{survey_id}/analytics/cross-tab",
+    response_model=CrossTabResult,
+    summary="Cross-tabulate two categorical questions",
+    description=(
+        "Build a contingency table between two categorical or "
+        "boolean questions, returning the full count matrix, row "
+        "and column labels, sample size, and (when applicable) the "
+        "Pearson chi-square statistic. Caller must hold at least "
+        "viewer permission."
+    ),
+)
 async def get_cross_tab(
     survey_id: UUID,
     q1: str = Query(..., description="Row question name"),
@@ -250,6 +282,14 @@ async def get_cross_tab(
 @router.get(
     "/{survey_id}/analytics/response-quality",
     response_model=ResponseQualityResult,
+    summary="Compute response-quality diagnostics",
+    description=(
+        "Surface response-quality diagnostics: completion rate, "
+        "median completion time, share of speeders (responses "
+        "completed below the floor), and share of straightliners "
+        "(identical answers across a Likert block). Useful for "
+        "filtering low-quality responses before downstream analysis."
+    ),
 )
 async def get_response_quality(
     survey_id: UUID,

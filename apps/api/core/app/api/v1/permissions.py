@@ -53,7 +53,16 @@ user_search_router = APIRouter(prefix="/users", tags=["users"])
 # ── Permission endpoints ──────────────────────────────────────────────
 
 
-@survey_permissions_router.get("", response_model=list[PermissionDetail])
+@survey_permissions_router.get(
+    "",
+    response_model=list[PermissionDetail],
+    summary="List a survey's collaborators",
+    description=(
+        "Return every user who has been granted a permission on "
+        "the survey, with their RBAC role and grant timestamp. "
+        "Caller must hold at least viewer permission."
+    ),
+)
 async def list_permissions(
     survey_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -86,7 +95,16 @@ async def list_permissions(
 
 
 @survey_permissions_router.post(
-    "", response_model=PermissionDetail, status_code=201
+    "",
+    response_model=PermissionDetail,
+    status_code=201,
+    summary="Grant a collaborator permission",
+    description=(
+        "Grant the specified user a role on the survey. Restricted "
+        "to the survey owner; the target user must already exist on "
+        "the platform. Returns 409 when the user already has a "
+        "permission on the survey."
+    ),
 )
 async def grant_permission(
     survey_id: UUID,
@@ -149,7 +167,14 @@ async def grant_permission(
 
 
 @survey_permissions_router.put(
-    "/{permission_id}", response_model=PermissionDetail
+    "/{permission_id}",
+    response_model=PermissionDetail,
+    summary="Update a collaborator's role",
+    description=(
+        "Change a collaborator's RBAC role on the survey. The "
+        "owner role itself cannot be changed (transfer-ownership "
+        "is a separate flow). Restricted to the survey owner."
+    ),
 )
 async def update_permission_role(
     survey_id: UUID,
@@ -204,7 +229,16 @@ async def update_permission_role(
     )
 
 
-@survey_permissions_router.delete("/{permission_id}", status_code=204)
+@survey_permissions_router.delete(
+    "/{permission_id}",
+    status_code=204,
+    summary="Revoke a collaborator's permission",
+    description=(
+        "Remove a collaborator's access to the survey. The owner's "
+        "own permission cannot be revoked through this endpoint. "
+        "Restricted to the survey owner."
+    ),
+)
 async def revoke_permission(
     survey_id: UUID,
     permission_id: UUID,
@@ -251,7 +285,17 @@ def _build_invite_url(token: str) -> str:
 
 
 @survey_invitations_router.post(
-    "", response_model=InvitationResponse, status_code=201
+    "",
+    response_model=InvitationResponse,
+    status_code=201,
+    summary="Send a collaboration invitation",
+    description=(
+        "Issue a new collaboration invitation for the survey. The "
+        "endpoint creates a 7-day token, persists a pending row, "
+        "and returns the invite URL the owner can share. Returns "
+        "409 when the email already collaborates or has a pending "
+        "invitation."
+    ),
 )
 async def create_invitation(
     survey_id: UUID,
@@ -329,7 +373,17 @@ async def create_invitation(
     )
 
 
-@survey_invitations_router.get("", response_model=list[InvitationResponse])
+@survey_invitations_router.get(
+    "",
+    response_model=list[InvitationResponse],
+    summary="List pending invitations for a survey",
+    description=(
+        "Return every invitation row attached to the survey "
+        "(pending, accepted, declined, expired), newest-first. "
+        "Restricted to the survey owner so the membership-request "
+        "history is not exposed to other collaborators."
+    ),
+)
 async def list_invitations(
     survey_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -362,7 +416,17 @@ async def list_invitations(
     ]
 
 
-@survey_invitations_router.delete("/{invitation_id}", status_code=204)
+@survey_invitations_router.delete(
+    "/{invitation_id}",
+    status_code=204,
+    summary="Revoke a pending invitation",
+    description=(
+        "Mark a pending invitation as ``expired`` so the invite "
+        "link can no longer be redeemed. Already-accepted or "
+        "already-expired invitations are unchanged. Restricted to "
+        "the survey owner."
+    ),
+)
 async def revoke_invitation(
     survey_id: UUID,
     invitation_id: UUID,
@@ -397,7 +461,18 @@ async def revoke_invitation(
 # ── Public invitation endpoints ───────────────────────────────────────
 
 
-@standalone_router.get("/{token}", response_model=InvitationResponse)
+@standalone_router.get(
+    "/{token}",
+    response_model=InvitationResponse,
+    summary="Look up an invitation by token",
+    description=(
+        "Resolve an invite token to its invitation record. Used by "
+        "the front-end invite-acceptance page to render the survey "
+        "title and required role before the recipient confirms. "
+        "Returns 410 when the invitation is no longer pending or "
+        "has expired."
+    ),
+)
 async def lookup_invitation(
     token: str,
     db: AsyncSession = Depends(get_db),
@@ -449,7 +524,17 @@ async def lookup_invitation(
 
 
 @standalone_router.post(
-    "/{token}/accept", response_model=InvitationAcceptResponse, status_code=201
+    "/{token}/accept",
+    response_model=InvitationAcceptResponse,
+    status_code=201,
+    summary="Accept a collaboration invitation",
+    description=(
+        "Accept a pending invitation for the authenticated user. "
+        "Creates a ``SurveyPermission`` row at the invitation's "
+        "role and marks the invitation ``accepted``. The caller's "
+        "logged-in email must match the invitation email; "
+        "otherwise the request is rejected with 403."
+    ),
 )
 async def accept_invitation(
     token: str,
@@ -548,7 +633,17 @@ async def accept_invitation(
 # ── User search endpoint ──────────────────────────────────────────────
 
 
-@user_search_router.get("/search", response_model=list[UserSearchItem])
+@user_search_router.get(
+    "/search",
+    response_model=list[UserSearchItem],
+    summary="Search users by email prefix",
+    description=(
+        "Search platform users by an email prefix; results are "
+        "capped at the supplied ``limit`` (default 10). Powers the "
+        "collaborator-picker autocomplete in the survey-sharing "
+        "dialog."
+    ),
+)
 async def search_users(
     q: str = Query(..., min_length=1, max_length=320, description="Email prefix"),
     limit: int = Query(default=10, ge=1, le=50),

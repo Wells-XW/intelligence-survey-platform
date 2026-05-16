@@ -1,24 +1,37 @@
 """Ethics & Compliance API endpoints.
 
 Provides rule-based compliance scanning (PIPL, GDPR, bias, sensitive info,
-consent) and AI-assisted deep review for survey questionnaires.
+consent) and AI-assisted deep review for survey questionnaires, plus the
+audit-log compliance export defined by Requirement 9.5 / design §Component
+11. The audit export pulls from ``audit_logs`` rather than from
+``compliance_check`` rows, so it lives on its own top-level
+``/compliance`` router (``compliance_audit_router``) instead of under the
+survey-scoped ``/surveys/{survey_id}/compliance/...`` prefix used by the
+PIPL/GDPR survey scanner endpoints.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core.deps import check_survey_permission, get_current_user
+from ...core.deps import (
+    Principal,
+    check_survey_permission,
+    get_current_user,
+    require_scope,
+)
 from ...core.prompts import ETHICS_REVIEW_SYSTEM, build_ethics_review_prompt
 from ...database import get_db
 from ...models.compliance_check import ComplianceCheck
 from ...models.survey import Survey
 from ...models.user import User
+from ...schemas.admin import AdminAuditLogOut
 from ...schemas.compliance import (
     AiReviewRequest,
     ComplianceCheckResponse,
@@ -28,9 +41,32 @@ from ...schemas.compliance import (
     ComplianceScanRequest,
     ComplianceSuggestion,
 )
+from ...services.audit_query import query_audit_logs
 from ...services.compliance_scanner import ComplianceScanner
 
 router = APIRouter(prefix="/surveys", tags=["compliance"])
+
+#: Top-level (non-survey-scoped) compliance router.
+#:
+#: Hosts the :func:`export_audit_logs_for_compliance` endpoint per
+#: Requirement 9.5 / design §Component 11. Audit rows are platform-wide
+#: rather than survey-scoped, so the route is intentionally not nested
+#: under ``/surveys/{survey_id}/compliance/...``.
+compliance_audit_router = APIRouter(prefix="/compliance", tags=["compliance"])
+
+#: Default trailing window applied when neither ``since`` nor ``until`` is
+#: supplied to :func:`export_audit_logs_for_compliance`.
+_AUDIT_EXPORT_DEFAULT_WINDOW = timedelta(days=30)
+
+#: Hard upper bound on rows returned per page by the audit export, mirroring
+#: ``app.api.v1.admin._LIST_MAX_LIMIT`` so compliance reviewers see the same
+#: bounded page sizes across the admin and compliance surfaces.
+_AUDIT_EXPORT_MAX_LIMIT: int = 5000
+
+#: Default page size for the audit export. Larger than the admin
+#: ``audit-logs`` default because compliance exports are typically consumed
+#: in bulk rather than browsed page-by-page.
+_AUDIT_EXPORT_DEFAULT_LIMIT: int = 500
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -145,6 +181,15 @@ def _build_report_markdown(
 @router.post(
     "/{survey_id}/compliance/scan",
     response_model=ComplianceCheckResponse,
+    summary="Run a compliance scan on a survey",
+    description=(
+        "Run a rule-based compliance scan over one survey across "
+        "PIPL, GDPR, methodological-bias, sensitive-info, consent, "
+        "and minimization dimensions. When ``include_ai_review`` is "
+        "true the rule-based findings are augmented with an "
+        "LLM-driven deep review (best-effort; AI failures are "
+        "swallowed). Persists a ``ComplianceCheck`` row for history."
+    ),
 )
 async def run_compliance_scan(
     survey_id: UUID,
@@ -277,6 +322,13 @@ async def run_compliance_scan(
 @router.get(
     "/{survey_id}/compliance/report",
     response_model=ComplianceReportResponse,
+    summary="Get the latest compliance report",
+    description=(
+        "Return a Markdown-rendered compliance report derived from "
+        "the most recent scan. When no prior scan exists a quick "
+        "in-line scan is run so the response is never empty. "
+        "Caller must hold at least viewer permission."
+    ),
 )
 async def get_compliance_report(
     survey_id: UUID,
@@ -352,6 +404,13 @@ async def get_compliance_report(
 @router.get(
     "/{survey_id}/compliance/history",
     response_model=ComplianceHistoryResponse,
+    summary="List past compliance checks",
+    description=(
+        "Return up to the 20 most recent compliance checks for one "
+        "survey, newest-first, plus the latest risk score and risk "
+        "level for quick dashboard rendering. Caller must hold at "
+        "least viewer permission."
+    ),
 )
 async def get_compliance_history(
     survey_id: UUID,
@@ -405,3 +464,133 @@ async def get_compliance_history(
         latest_risk_level=latest_level,
         total_checks=len(check_responses),
     )
+
+
+# ── Compliance Audit Export Endpoint ────────────────────────────────────
+
+
+@compliance_audit_router.get(
+    "/audit-export",
+    response_model=List[AdminAuditLogOut],
+    summary="Export audit-log rows for compliance review",
+    description=(
+        "Per Requirement 9.5 and design §Component 11 the compliance "
+        "module exports every audit row in a requested time range so "
+        "PIPL/GDPR reviewers can see API key lifecycle events, "
+        "webhook subscription configuration events, webhook delivery "
+        "outcomes, export job lifecycle events, and rate-limit "
+        "rejection events alongside the existing audit verbs.\n\n"
+        "**Time window.** Defaults to the trailing 30 days when neither "
+        "``since`` nor ``until`` is supplied. Either bound may be "
+        "passed alone; the unsupplied bound is left open.\n\n"
+        "**Verb filter.** No verb whitelist is applied by default — "
+        "every row in the requested time range is returned. Pass "
+        "``verbs`` to scope the export to a specific subset (for "
+        "example, ``verbs=api_key.create&verbs=api_key.revoke`` to "
+        "review only API key lifecycle activity). The integration "
+        "anchor for the T15 verb set lives at "
+        "``app.services.audit_query._COMPLIANCE_EXPORT_VERB_WHITELIST``"
+        " — its smoke check guarantees the new verbs remain covered "
+        "even if a future schema change introduces a whitelist.\n\n"
+        "**Caller scope.** Caller must hold the ``audit:read`` scope. "
+        "JWT-authenticated administrators pass this check by virtue "
+        "of the wildcard scope; API-key callers must have "
+        "``audit:read`` on the key."
+    ),
+)
+async def export_audit_logs_for_compliance(
+    since: Optional[datetime] = Query(
+        default=None,
+        description=(
+            "Inclusive lower bound on ``AuditLog.created_at``. When "
+            "omitted together with ``until`` the export defaults to "
+            "the trailing 30 days."
+        ),
+    ),
+    until: Optional[datetime] = Query(
+        default=None,
+        description=(
+            "Exclusive upper bound on ``AuditLog.created_at``. When "
+            "omitted together with ``since`` the export defaults to "
+            "the trailing 30 days."
+        ),
+    ),
+    verbs: Optional[List[str]] = Query(
+        default=None,
+        description=(
+            "Optional list of action verbs to filter on (OR-match). "
+            "Omit to include every verb in the requested time range "
+            "per Req 9.5."
+        ),
+    ),
+    offset: int = Query(default=0, ge=0, description="Pagination offset."),
+    limit: int = Query(
+        default=_AUDIT_EXPORT_DEFAULT_LIMIT,
+        ge=1,
+        le=_AUDIT_EXPORT_MAX_LIMIT,
+        description=(
+            "Maximum rows to return. Capped at "
+            f"{_AUDIT_EXPORT_MAX_LIMIT} to keep responses bounded."
+        ),
+    ),
+    principal: Principal = Depends(require_scope("audit:read")),
+    db: AsyncSession = Depends(get_db),
+) -> List[AdminAuditLogOut]:
+    """Export audit-log rows for the requested compliance review window.
+
+    Thin wrapper over :func:`app.services.audit_query.query_audit_logs`
+    that applies the compliance-export defaults (trailing 30-day
+    window, no verb whitelist) described in design §Component 11. The
+    endpoint does not filter by survey id because audit rows record
+    platform-wide activity (API key lifecycle, webhook delivery, export
+    jobs, rate-limit rejections) rather than survey-scoped events.
+
+    Args:
+        since: Optional inclusive lower bound on ``AuditLog.created_at``.
+            Defaults to ``until - 30 days`` when both bounds are
+            omitted; left open otherwise.
+        until: Optional exclusive upper bound on ``AuditLog.created_at``.
+            Defaults to "now" when both bounds are omitted; left open
+            otherwise.
+        verbs: Optional list of action verbs to filter on. ``None``
+            returns every verb in the time range per Req 9.5.
+        offset: Pagination offset.
+        limit: Page size, capped at :data:`_AUDIT_EXPORT_MAX_LIMIT`.
+        principal: Caller resolved by :func:`require_scope` for
+            ``audit:read``.
+        db: Async database session.
+
+    Returns:
+        Newest-first list of :class:`AdminAuditLogOut` payloads
+        covering every matching audit row in the resolved time range.
+    """
+    # Apply the default trailing 30-day window only when *both* bounds
+    # are omitted. A caller passing one bound is signalling an open
+    # range deliberately and we must not silently override it.
+    if since is None and until is None:
+        until = datetime.now(timezone.utc)
+        since = until - _AUDIT_EXPORT_DEFAULT_WINDOW
+
+    rows = await query_audit_logs(
+        db,
+        actions=verbs,
+        since=since,
+        until=until,
+        offset=offset,
+        limit=limit,
+    )
+
+    return [
+        AdminAuditLogOut(
+            id=row.id,
+            user_id=row.user_id,
+            action=row.action,
+            resource_type=row.resource_type,
+            resource_id=row.resource_id,
+            details=row.details,
+            ip_address=row.ip_address,
+            user_agent=row.user_agent,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]

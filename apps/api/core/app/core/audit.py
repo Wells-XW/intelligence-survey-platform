@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, FrozenSet
 
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,55 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.audit_log import AuditLog
 
 logger = logging.getLogger(__name__)
+
+
+API_PLATFORM_VERBS: FrozenSet[str] = frozenset(
+    {
+        # API key lifecycle (Req 7.1, 9.4) — feature: API Open Platform
+        "api_key.create",
+        "api_key.rotate",
+        "api_key.revoke",
+        "api_key.admin_revoke",
+        # Webhook subscription configuration (Req 7.2)
+        "webhook.subscription.create",
+        "webhook.subscription.update",
+        "webhook.subscription.rotate_secret",
+        "webhook.subscription.delete",
+        # Webhook delivery outcomes (Req 7.3)
+        "webhook.delivery.succeeded",
+        "webhook.delivery.failed",
+        # Export job lifecycle (Req 7.4)
+        "export.job.created",
+        "export.job.succeeded",
+        "export.job.failed",
+        "export.job.expired",
+        # Per-API-key rate limiter outcomes (Req 7.5)
+        "rate_limit.rejected",
+        "rate_limiter.backend_unavailable",
+    }
+)
+"""Canonical action verbs emitted by the API Open Platform feature (T15).
+
+These hierarchical dotted verbs are written to ``audit_logs.action`` by the
+new API key, webhook, export, and rate-limit subsystems. The existing
+``audit_logs`` schema is reused unchanged: each verb stores a row whose
+``action`` column holds the verb literal, ``resource_type`` / ``resource_id``
+identify the affected entity (e.g. ``api_key``, ``webhook_subscription``,
+``webhook_delivery``, ``export_job``, or ``system``), and any extras
+(``key_name``, ``target_url``, ``event_type``, ``attempt_count``, ``format``,
+``byte_size``, ``window_label``, etc.) flow into the ``details`` JSONB
+column. Per Req 7.9, fields that do not fit the schema-compatible subset
+are dropped silently rather than triggering a migration.
+
+Other modules import this set to validate or enumerate the new verbs::
+
+    from app.core.audit import API_PLATFORM_VERBS
+
+    assert "api_key.create" in API_PLATFORM_VERBS
+
+The set is intentionally a ``frozenset`` so callers cannot mutate the
+canonical registry at runtime.
+"""
 
 
 async def log_audit(

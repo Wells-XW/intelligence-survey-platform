@@ -68,7 +68,17 @@ async def _get_lit_service(
 # Literature Search
 # ═══════════════════════════════════════════════════════════════════════════
 
-@router.get("/search/literature", response_model=LiteratureSearchResponse)
+@router.get(
+    "/search/literature",
+    response_model=LiteratureSearchResponse,
+    summary="Search academic literature",
+    description=(
+        "Search PubMed and Semantic Scholar for academic papers "
+        "matching ``query``. Supports keyword, author, DOI, and "
+        "topic searches plus optional year filters. Results are "
+        "deduplicated and cached in Redis for one hour."
+    ),
+)
 async def search_literature(
     query: str = Query(..., min_length=2, max_length=500),
     source: str = Query(default="all"),
@@ -98,7 +108,17 @@ async def search_literature(
 # Saved References
 # ═══════════════════════════════════════════════════════════════════════════
 
-@router.get("/references", response_model=SavedReferenceListResponse)
+@router.get(
+    "/references",
+    response_model=SavedReferenceListResponse,
+    summary="List the caller's saved literature references",
+    description=(
+        "Return the authenticated user's bookmarked literature "
+        "references, paginated by ``offset`` and ``limit``. Useful "
+        "for hydrating a reference manager pane in the survey "
+        "editor."
+    ),
+)
 async def list_saved_references(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -109,7 +129,18 @@ async def list_saved_references(
     return await service.get_saved_references(user.id, limit, offset)
 
 
-@router.post("/references", response_model=SavedReferenceResponse, status_code=201)
+@router.post(
+    "/references",
+    response_model=SavedReferenceResponse,
+    status_code=201,
+    summary="Save a literature reference",
+    description=(
+        "Bookmark one literature reference for the authenticated "
+        "user. Idempotent on the (user, identifier) pair: a second "
+        "call with the same reference upserts rather than creating "
+        "a duplicate. Emits a ``save_reference`` audit row."
+    ),
+)
 async def save_reference(
     data: SaveReferenceRequest,
     request: Request,
@@ -131,7 +162,16 @@ async def save_reference(
     return SavedReferenceResponse.model_validate(ref)
 
 
-@router.delete("/references/{ref_id}", status_code=204)
+@router.delete(
+    "/references/{ref_id}",
+    status_code=204,
+    summary="Delete a saved literature reference",
+    description=(
+        "Remove one bookmark from the authenticated user's saved "
+        "references. Returns 404 if the bookmark does not belong "
+        "to the caller. Emits a ``delete_reference`` audit row."
+    ),
+)
 async def delete_reference(
     ref_id: str,
     request: Request,
@@ -158,7 +198,17 @@ async def delete_reference(
 # Knowledge Scales
 # ═══════════════════════════════════════════════════════════════════════════
 
-@router.get("/search/scales", response_model=ScaleSearchResponse)
+@router.get(
+    "/search/scales",
+    response_model=ScaleSearchResponse,
+    summary="Search the measurement scale library",
+    description=(
+        "Full-text search the platform's measurement-scale library "
+        "by ``query`` plus optional ``discipline`` and ``language`` "
+        "filters. Used by the survey editor to discover and import "
+        "validated scales."
+    ),
+)
 async def search_scales(
     query: Optional[str] = Query(default=None),
     discipline: Optional[str] = Query(default=None),
@@ -174,7 +224,16 @@ async def search_scales(
     return await service.search_scales(req)
 
 
-@router.get("/scales", response_model=ScaleSearchResponse)
+@router.get(
+    "/scales",
+    response_model=ScaleSearchResponse,
+    summary="Browse all measurement scales",
+    description=(
+        "Browse the measurement-scale library without a search "
+        "query, with optional ``discipline`` and ``language`` "
+        "filters. Endpoint is publicly readable."
+    ),
+)
 async def list_scales(
     discipline: Optional[str] = Query(default=None),
     language: Optional[str] = Query(default=None),
@@ -187,7 +246,16 @@ async def list_scales(
     return await service.search_scales(req)
 
 
-@router.get("/scales/{scale_id}", response_model=ScaleResponse)
+@router.get(
+    "/scales/{scale_id}",
+    response_model=ScaleResponse,
+    summary="Get a measurement scale by id",
+    description=(
+        "Return one measurement scale with the full item list, "
+        "rating semantics, language, citations, and reported "
+        "psychometric stats (Cronbach's alpha when known)."
+    ),
+)
 async def get_scale(
     scale_id: str,
     service: ScaleLibraryService = Depends(_get_scale_service),
@@ -199,7 +267,18 @@ async def get_scale(
     return ScaleResponse.model_validate(scale)
 
 
-@router.post("/scales", response_model=ScaleResponse, status_code=201)
+@router.post(
+    "/scales",
+    response_model=ScaleResponse,
+    status_code=201,
+    summary="Create a measurement scale",
+    description=(
+        "Create a new measurement-scale library entry owned by the "
+        "authenticated user. Use this when contributing a published "
+        "scale or a custom in-house instrument. Emits a "
+        "``create_scale`` audit row."
+    ),
+)
 async def create_scale(
     data: ScaleCreateRequest,
     request: Request,
@@ -221,7 +300,16 @@ async def create_scale(
     return ScaleResponse.model_validate(scale)
 
 
-@router.put("/scales/{scale_id}", response_model=ScaleResponse)
+@router.put(
+    "/scales/{scale_id}",
+    response_model=ScaleResponse,
+    summary="Update a measurement scale",
+    description=(
+        "Replace the contents of one measurement-scale entry. The "
+        "request body must carry the full new state (no partial "
+        "updates). Emits an ``update_scale`` audit row."
+    ),
+)
 async def update_scale(
     scale_id: str,
     data: ScaleCreateRequest,
@@ -246,7 +334,16 @@ async def update_scale(
     return ScaleResponse.model_validate(scale)
 
 
-@router.delete("/scales/{scale_id}", status_code=204)
+@router.delete(
+    "/scales/{scale_id}",
+    status_code=204,
+    summary="Delete a measurement scale",
+    description=(
+        "Remove one measurement-scale entry from the library. "
+        "Surveys that already imported its items keep their copies. "
+        "Emits a ``delete_scale`` audit row."
+    ),
+)
 async def delete_scale(
     scale_id: str,
     request: Request,
@@ -269,7 +366,18 @@ async def delete_scale(
     )
 
 
-@router.post("/scales/{scale_id}/import", response_model=ScaleImportResponse)
+@router.post(
+    "/scales/{scale_id}/import",
+    response_model=ScaleImportResponse,
+    summary="Import a scale's items into a survey",
+    description=(
+        "Append every item of one measurement scale into the "
+        "specified survey at ``position``. The survey's "
+        "``json_content`` is updated atomically and its ``version`` "
+        "is bumped. Caller must hold editor or owner permission on "
+        "the target survey. Emits an ``import_scale`` audit row."
+    ),
+)
 async def import_scale_to_survey(
     scale_id: str,
     data: ScaleImportRequest,
@@ -321,7 +429,19 @@ async def import_scale_to_survey(
 # Scale Extraction (AI-powered)
 # ═══════════════════════════════════════════════════════════════════════════
 
-@router.post("/scales/extract", response_model=ScaleResponse, status_code=201)
+@router.post(
+    "/scales/extract",
+    response_model=ScaleResponse,
+    status_code=201,
+    summary="AI-extract a scale from text or DOI",
+    description=(
+        "Use the AI pipeline to extract a structured measurement "
+        "scale from a paper abstract or a DOI. The extracted scale "
+        "is saved to the library and returned. Useful for "
+        "fast-tracking validated instruments described in source "
+        "papers without manual transcription."
+    ),
+)
 async def extract_scale_from_text(
     data: ScaleExtractRequest,
     request: Request,
@@ -406,7 +526,17 @@ async def extract_scale_from_text(
 # Knowledge Entries
 # ═══════════════════════════════════════════════════════════════════════════
 
-@router.get("/entries", response_model=KnowledgeEntrySearchResponse)
+@router.get(
+    "/entries",
+    response_model=KnowledgeEntrySearchResponse,
+    summary="Search published knowledge base entries",
+    description=(
+        "Search the platform's curated knowledge-base entries "
+        "(method explainers, statistical primers, ethics notes) by "
+        "free-text ``query`` plus optional ``category`` and "
+        "``language`` filters. Endpoint is publicly readable."
+    ),
+)
 async def search_entries(
     query: Optional[str] = Query(default=None),
     category: Optional[str] = Query(default=None),
@@ -422,7 +552,15 @@ async def search_entries(
     return await service.search_entries(req)
 
 
-@router.get("/entries/{entry_id}")
+@router.get(
+    "/entries/{entry_id}",
+    summary="Get a knowledge base entry by id",
+    description=(
+        "Return one knowledge-base entry's full Markdown content "
+        "plus metadata. Used by the in-app help drawer to deep-link "
+        "to topic-specific guidance."
+    ),
+)
 async def get_entry(
     entry_id: str,
     service: KnowledgeBaseService = Depends(_get_kb_service),
@@ -440,7 +578,17 @@ async def get_entry(
 # AI-Assisted Search
 # ═══════════════════════════════════════════════════════════════════════════
 
-@router.post("/search/ai-assisted", response_model=AiAssistedSearchResponse)
+@router.post(
+    "/search/ai-assisted",
+    response_model=AiAssistedSearchResponse,
+    summary="AI-assisted literature and scale search",
+    description=(
+        "Perform an AI-enhanced search that expands the caller's "
+        "natural-language query into related terms, then runs "
+        "literature and scale searches in parallel. Returns merged "
+        "results plus the expansion terms used."
+    ),
+)
 async def ai_assisted_search(
     data: AiAssistedSearchRequest,
     user: User = Depends(get_current_user),

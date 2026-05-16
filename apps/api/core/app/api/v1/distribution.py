@@ -50,6 +50,10 @@ from ...services.sample_service import (
     update_quota_on_response,
     update_recipient_count,
 )
+from ...services.webhook_emitter import (
+    emit_webhook_event,
+    enqueue_webhook_deliveries,
+)
 
 router = APIRouter(prefix="/surveys", tags=["distribution"])
 
@@ -59,7 +63,18 @@ router = APIRouter(prefix="/surveys", tags=["distribution"])
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-@router.post("/{survey_id}/sample-groups", response_model=SampleGroupResponse, status_code=201)
+@router.post(
+    "/{survey_id}/sample-groups",
+    response_model=SampleGroupResponse,
+    status_code=201,
+    summary="Create a sample group",
+    description=(
+        "Create a sample group attached to a survey. Sample groups "
+        "scope a list of recipients for one or more distribution "
+        "campaigns. Caller must hold editor or owner permission on "
+        "the survey. Emits a ``sample_group.create`` audit row."
+    ),
+)
 async def create_sample_group(
     survey_id: UUID,
     body: CreateSampleGroupRequest,
@@ -84,7 +99,16 @@ async def create_sample_group(
     return SampleGroupResponse.model_validate(group)
 
 
-@router.get("/{survey_id}/sample-groups", response_model=list[SampleGroupListItem])
+@router.get(
+    "/{survey_id}/sample-groups",
+    response_model=list[SampleGroupListItem],
+    summary="List sample groups for a survey",
+    description=(
+        "List every sample group attached to the survey, "
+        "newest-first. Caller must hold at least viewer permission "
+        "on the survey."
+    ),
+)
 async def list_sample_groups(
     survey_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -102,7 +126,16 @@ async def list_sample_groups(
     return [SampleGroupListItem.model_validate(g) for g in result.scalars().all()]
 
 
-@router.get("/{survey_id}/sample-groups/{group_id}", response_model=SampleGroupResponse)
+@router.get(
+    "/{survey_id}/sample-groups/{group_id}",
+    response_model=SampleGroupResponse,
+    summary="Get a sample group by id",
+    description=(
+        "Return one sample group's metadata and recipient counts. "
+        "Caller must hold at least viewer permission on the parent "
+        "survey."
+    ),
+)
 async def get_sample_group(
     survey_id: UUID,
     group_id: UUID,
@@ -123,7 +156,16 @@ async def get_sample_group(
     return SampleGroupResponse.model_validate(group)
 
 
-@router.put("/{survey_id}/sample-groups/{group_id}", response_model=SampleGroupResponse)
+@router.put(
+    "/{survey_id}/sample-groups/{group_id}",
+    response_model=SampleGroupResponse,
+    summary="Update a sample group",
+    description=(
+        "Update one sample group's name or description. The "
+        "associated recipient list is unchanged. Caller must hold "
+        "editor or owner permission."
+    ),
+)
 async def update_sample_group(
     survey_id: UUID,
     group_id: UUID,
@@ -159,7 +201,17 @@ async def update_sample_group(
     return SampleGroupResponse.model_validate(group)
 
 
-@router.delete("/{survey_id}/sample-groups/{group_id}", status_code=204)
+@router.delete(
+    "/{survey_id}/sample-groups/{group_id}",
+    status_code=204,
+    summary="Delete a sample group",
+    description=(
+        "Hard-delete one sample group and all of its recipients. "
+        "Distribution campaigns referencing the group must be "
+        "deleted first or they will fail subsequent operations. "
+        "Restricted to the survey owner."
+    ),
+)
 async def delete_sample_group(
     survey_id: UUID,
     group_id: UUID,
@@ -196,6 +248,13 @@ async def delete_sample_group(
     "/{survey_id}/sample-groups/{group_id}/recipients",
     response_model=RecipientResponse,
     status_code=201,
+    summary="Add a recipient to a sample group",
+    description=(
+        "Append one recipient to a sample group. Demographics are "
+        "stored as a JSON object so quota matching can later filter "
+        "by arbitrary fields. Caller must hold editor or owner "
+        "permission."
+    ),
 )
 async def add_recipient(
     survey_id: UUID,
@@ -237,6 +296,14 @@ async def add_recipient(
 @router.post(
     "/{survey_id}/sample-groups/{group_id}/recipients/import",
     response_model=RecipientImportResult,
+    summary="Import recipients from a CSV file",
+    description=(
+        "Bulk-import recipients from a CSV upload (UTF-8 or GBK). "
+        "Required columns are ``email/邮箱`` and ``name/姓名``; "
+        "any other columns are stored as demographics. Capped at "
+        "500 recipients per import. Emits a ``recipient.import`` "
+        "audit row carrying the imported count."
+    ),
 )
 async def import_recipients_csv(
     survey_id: UUID,
@@ -312,6 +379,12 @@ async def import_recipients_csv(
 @router.get(
     "/{survey_id}/sample-groups/{group_id}/recipients",
     response_model=list[RecipientListItem],
+    summary="List recipients in a sample group",
+    description=(
+        "List recipients in one sample group, newest-first, with "
+        "their per-recipient send and completion status. Caller "
+        "must hold at least viewer permission on the survey."
+    ),
 )
 async def list_recipients(
     survey_id: UUID,
@@ -339,6 +412,11 @@ async def list_recipients(
 @router.put(
     "/{survey_id}/sample-groups/{group_id}/recipients/{recipient_id}",
     response_model=RecipientResponse,
+    summary="Update a recipient",
+    description=(
+        "Update one recipient's contact info or demographics. "
+        "Caller must hold editor or owner permission on the survey."
+    ),
 )
 async def update_recipient(
     survey_id: UUID,
@@ -382,6 +460,12 @@ async def update_recipient(
 @router.delete(
     "/{survey_id}/sample-groups/{group_id}/recipients/{recipient_id}",
     status_code=204,
+    summary="Remove a recipient from a sample group",
+    description=(
+        "Remove one recipient from a sample group and decrement "
+        "the group's cached recipient count. Caller must hold "
+        "editor or owner permission."
+    ),
 )
 async def delete_recipient(
     survey_id: UUID,
@@ -420,7 +504,20 @@ async def delete_recipient(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-@router.post("/{survey_id}/distributions", response_model=DistributionResponse, status_code=201)
+@router.post(
+    "/{survey_id}/distributions",
+    response_model=DistributionResponse,
+    status_code=201,
+    summary="Create a distribution campaign",
+    description=(
+        "Create a distribution campaign that will deliver the "
+        "survey to a sample group's recipients. The survey must "
+        "be in ``published`` status; campaigns can be scheduled "
+        "for a future ``scheduled_at`` or sent immediately via "
+        "``POST /distributions/{distribution_id}/send``. Caller "
+        "must hold editor or owner permission."
+    ),
+)
 async def create_distribution(
     survey_id: UUID,
     body: CreateDistributionRequest,
@@ -477,7 +574,17 @@ async def create_distribution(
     return DistributionResponse.model_validate(distribution)
 
 
-@router.get("/{survey_id}/distributions", response_model=list[DistributionListItem])
+@router.get(
+    "/{survey_id}/distributions",
+    response_model=list[DistributionListItem],
+    summary="List distributions for a survey",
+    description=(
+        "List every distribution campaign created for the survey, "
+        "newest-first, with each row carrying its sample-group "
+        "name for display. Caller must hold at least viewer "
+        "permission."
+    ),
+)
 async def list_distributions(
     survey_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -502,7 +609,14 @@ async def list_distributions(
 
 
 @router.get(
-    "/{survey_id}/distributions/{distribution_id}", response_model=DistributionResponse
+    "/{survey_id}/distributions/{distribution_id}",
+    response_model=DistributionResponse,
+    summary="Get a distribution by id",
+    description=(
+        "Return one distribution campaign's full record including "
+        "subject and body templates. Caller must hold at least "
+        "viewer permission on the survey."
+    ),
 )
 async def get_distribution(
     survey_id: UUID,
@@ -529,6 +643,16 @@ async def get_distribution(
 @router.post(
     "/{survey_id}/distributions/{distribution_id}/send",
     response_model=SendDistributionResponse,
+    summary="Execute a distribution and generate links",
+    description=(
+        "Execute one distribution campaign: mark every "
+        "``pending`` recipient as ``sent``, generate per-recipient "
+        "tracking tokens, and emit a ``distribution.sent`` webhook "
+        "event for any active subscribers. Idempotent on already "
+        "``sent`` campaigns; a re-send only processes recipients "
+        "still in ``pending``. Caller must hold editor or owner "
+        "permission."
+    ),
 )
 async def send_distribution(
     survey_id: UUID,
@@ -591,8 +715,28 @@ async def send_distribution(
         },
         request=request,
     )
+
+    # Emit distribution.sent webhook event for any subscribers. Insert
+    # delivery rows in the same transaction; enqueue Celery tasks only
+    # after commit succeeds.
+    delivery_ids = await emit_webhook_event(
+        db,
+        event_type="distribution.sent",
+        survey_id=sid,
+        payload={
+            "survey_id": sid,
+            "distribution_id": did,
+            "distribution_name": dist.name,
+            "sample_group_id": dist.sample_group_id,
+            "recipients_processed": links_generated,
+            "links_generated": links_generated,
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
     await db.commit()
     await db.refresh(dist)
+    enqueue_webhook_deliveries(delivery_ids)
 
     return SendDistributionResponse(
         distribution_id=did,
@@ -604,6 +748,14 @@ async def send_distribution(
 @router.post(
     "/{survey_id}/distributions/{distribution_id}/remind",
     response_model=SendDistributionResponse,
+    summary="Send reminders to non-completed recipients",
+    description=(
+        "Re-stamp ``sent_at`` on recipients of the campaign whose "
+        "status is still ``sent``, ``opened``, or ``started``. The "
+        "operation is intended to drive a downstream "
+        "email-reminder pipeline once that integration is wired in. "
+        "Caller must hold editor or owner permission."
+    ),
 )
 async def remind_distribution(
     survey_id: UUID,
@@ -665,7 +817,18 @@ async def remind_distribution(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-@router.post("/{survey_id}/quotas", response_model=QuotaResponse, status_code=201)
+@router.post(
+    "/{survey_id}/quotas",
+    response_model=QuotaResponse,
+    status_code=201,
+    summary="Create a demographic quota",
+    description=(
+        "Create a demographic quota cap for one survey. Quotas are "
+        "evaluated each time a response is submitted; once a quota "
+        "fills, a ``quota.reached`` webhook event is emitted. "
+        "Caller must hold editor or owner permission."
+    ),
+)
 async def create_quota(
     survey_id: UUID,
     body: CreateQuotaRequest,
@@ -697,7 +860,16 @@ async def create_quota(
     return _build_quota_response(quota)
 
 
-@router.get("/{survey_id}/quotas", response_model=list[QuotaResponse])
+@router.get(
+    "/{survey_id}/quotas",
+    response_model=list[QuotaResponse],
+    summary="List quotas for a survey",
+    description=(
+        "List every quota configured for the survey, newest-first, "
+        "with the running count and target. Caller must hold at "
+        "least viewer permission."
+    ),
+)
 async def list_quotas(
     survey_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -715,7 +887,16 @@ async def list_quotas(
     return [_build_quota_response(q) for q in result.scalars().all()]
 
 
-@router.put("/{survey_id}/quotas/{quota_id}", response_model=QuotaResponse)
+@router.put(
+    "/{survey_id}/quotas/{quota_id}",
+    response_model=QuotaResponse,
+    summary="Update a quota",
+    description=(
+        "Partial update of one quota's name, target count, "
+        "matching criteria, or active flag. Caller must hold "
+        "editor or owner permission."
+    ),
+)
 async def update_quota(
     survey_id: UUID,
     quota_id: UUID,
@@ -755,7 +936,16 @@ async def update_quota(
     return _build_quota_response(quota)
 
 
-@router.delete("/{survey_id}/quotas/{quota_id}", status_code=204)
+@router.delete(
+    "/{survey_id}/quotas/{quota_id}",
+    status_code=204,
+    summary="Delete a quota",
+    description=(
+        "Hard-delete one quota. Restricted to the survey owner; "
+        "in-flight responses will no longer be matched against the "
+        "deleted quota."
+    ),
+)
 async def delete_quota(
     survey_id: UUID,
     quota_id: UUID,
@@ -791,6 +981,14 @@ async def delete_quota(
 @router.get(
     "/{survey_id}/distribution-dashboard",
     response_model=DistributionDashboardResponse,
+    summary="Get the distribution dashboard for a survey",
+    description=(
+        "Aggregate one survey's distribution health into a single "
+        "payload: total recipients, response count, response rate, "
+        "active and total distribution counts, current quotas, and "
+        "the sample-group inventory. Caller must hold at least "
+        "viewer permission."
+    ),
 )
 async def get_distribution_dashboard(
     survey_id: UUID,
@@ -873,7 +1071,18 @@ async def get_distribution_dashboard(
 public_router = APIRouter(prefix="/surveys", tags=["distribution-public"])
 
 
-@public_router.get("/fill/{token}")
+@public_router.get(
+    "/fill/{token}",
+    summary="Resolve a recipient token to a survey fill URL",
+    description=(
+        "Public endpoint: resolve a per-recipient invite token "
+        "into the redirect target the front-end should load. The "
+        "first call also marks the recipient as ``opened`` so the "
+        "distribution dashboard reflects accurate engagement. "
+        "Tokens are 32-character ``uuid.hex`` values minted at "
+        "send time."
+    ),
+)
 async def resolve_fill_token(
     token: str,
     request: Request,

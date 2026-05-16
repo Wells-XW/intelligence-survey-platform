@@ -9,7 +9,7 @@ the answers JSONB. See the platform's Data Minimization Policy.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SubmitResponseRequest(BaseModel):
@@ -33,6 +33,22 @@ class SubmitResponseRequest(BaseModel):
     )
     is_complete: bool = Field(default=True)
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "answers": {"q1": 4, "q2": "非常符合", "q3": ["a", "c"]},
+                    "metadata": {
+                        "pipl_consent": True,
+                        "completion_time_seconds": 142.5,
+                    },
+                    "respondent_id": "recipient_38291",
+                    "is_complete": True,
+                }
+            ]
+        }
+    )
+
 
 class SurveyResponseOut(BaseModel):
     """Full response record returned to survey owners."""
@@ -45,7 +61,28 @@ class SurveyResponseOut(BaseModel):
     is_complete: bool
     submitted_at: datetime
 
-    model_config = {"from_attributes": True, "populate_by_name": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "8a11d3b0-7384-4d9a-83b0-d9a84f3b9f1e",
+                    "survey_id": "d3b07384-d9a8-4f3b-9f1e-6c2a4d2c8a11",
+                    "respondent_id": "recipient_38291",
+                    "answers": {"q1": 4, "q2": "非常符合", "q3": ["a", "c"]},
+                    "metadata": {
+                        "pipl_consent": True,
+                        "completion_time_seconds": 142.5,
+                        "ip_address": "198.51.100.0",
+                        "user_agent": "Mozilla/5.0",
+                    },
+                    "is_complete": True,
+                    "submitted_at": "2026-09-15T10:23:00Z",
+                }
+            ]
+        },
+    )
 
 
 class SurveyResponseListItem(BaseModel):
@@ -58,7 +95,21 @@ class SurveyResponseListItem(BaseModel):
     completion_time_seconds: Optional[float] = None
     submitted_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "8a11d3b0-7384-4d9a-83b0-d9a84f3b9f1e",
+                    "survey_id": "d3b07384-d9a8-4f3b-9f1e-6c2a4d2c8a11",
+                    "respondent_id": "recipient_38291",
+                    "is_complete": True,
+                    "completion_time_seconds": 142.5,
+                    "submitted_at": "2026-09-15T10:23:00Z",
+                }
+            ]
+        },
+    )
 
     @classmethod
     def from_orm_row(cls, row) -> "SurveyResponseListItem":

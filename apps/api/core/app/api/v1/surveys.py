@@ -25,7 +25,17 @@ from ...schemas.survey import (
 router = APIRouter(prefix="/surveys", tags=["surveys"])
 
 
-@router.get("", response_model=list[SurveyListItem])
+@router.get(
+    "",
+    response_model=list[SurveyListItem],
+    summary="List the caller's surveys",
+    description=(
+        "Return surveys the authenticated user can access via any "
+        "RBAC role (owner, editor, or viewer), newest-updated first. "
+        "Filter optionally by ``status`` and paginate with "
+        "``offset`` and ``limit`` (page size capped at 200)."
+    ),
+)
 async def list_surveys(
     status: str | None = Query(default=None, description="Filter by status"),
     limit: int = Query(default=50, ge=1, le=200),
@@ -49,7 +59,18 @@ async def list_surveys(
     return [SurveyListItem.model_validate(s) for s in surveys]
 
 
-@router.post("", response_model=SurveyResponse, status_code=201)
+@router.post(
+    "",
+    response_model=SurveyResponse,
+    status_code=201,
+    summary="Create a new survey",
+    description=(
+        "Create a new survey owned by the authenticated user. The "
+        "creating user is automatically granted the ``owner`` role "
+        "via a fresh ``SurveyPermission`` row. Emits a "
+        "``survey.create`` audit row."
+    ),
+)
 async def create_survey(
     body: CreateSurveyRequest,
     request: Request,
@@ -85,7 +106,17 @@ async def create_survey(
     return SurveyResponse.model_validate(survey)
 
 
-@router.get("/{survey_id}", response_model=SurveyResponse)
+@router.get(
+    "/{survey_id}",
+    response_model=SurveyResponse,
+    summary="Get a survey by id",
+    description=(
+        "Return one survey's full record including the SurveyJS "
+        "``json_content`` payload. Caller must hold at least viewer "
+        "permission. The response includes the optimistic-locking "
+        "``version`` field used by ``PUT /{survey_id}``."
+    ),
+)
 async def get_survey(
     survey_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -101,7 +132,19 @@ async def get_survey(
     return SurveyResponse.model_validate(survey)
 
 
-@router.put("/{survey_id}", response_model=SurveyResponse)
+@router.put(
+    "/{survey_id}",
+    response_model=SurveyResponse,
+    summary="Update a survey",
+    description=(
+        "Apply a partial update to one survey. Supports "
+        "optimistic-lock checking via ``expected_version`` (a 409 "
+        "Conflict is returned when stale). Each successful update "
+        "writes an immutable ``SurveyVersion`` snapshot for the "
+        "version-history endpoints. Caller must hold editor or "
+        "owner permission."
+    ),
+)
 async def update_survey(
     survey_id: UUID,
     body: UpdateSurveyRequest,
@@ -167,7 +210,17 @@ async def update_survey(
     return SurveyResponse.model_validate(survey)
 
 
-@router.delete("/{survey_id}", status_code=204)
+@router.delete(
+    "/{survey_id}",
+    status_code=204,
+    summary="Delete a survey",
+    description=(
+        "Hard-delete one survey and all rows that cascade from it "
+        "(responses, sample groups, distributions, version history). "
+        "Restricted to the survey owner; this operation is not "
+        "reversible. Emits a ``survey.delete`` audit row."
+    ),
+)
 async def delete_survey(
     survey_id: UUID,
     request: Request,

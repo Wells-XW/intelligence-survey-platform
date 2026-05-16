@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -59,6 +59,33 @@ class LiteratureSearchResponse(BaseModel):
     query: str
     cached: bool = False
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "results": [
+                        {
+                            "title": "Academic integrity among graduate students in China",
+                            "authors": ["Wang, L.", "Liu, Y."],
+                            "year": 2021,
+                            "journal": "Journal of Academic Ethics",
+                            "abstract": "We surveyed 612 graduate students…",
+                            "doi": "10.1007/s10805-021-09412-7",
+                            "url": "https://doi.org/10.1007/s10805-021-09412-7",
+                            "source": "semantic_scholar",
+                            "external_id": "S2:212f3b9c1e",
+                            "keywords": ["academic integrity", "China"],
+                        }
+                    ],
+                    "total_count": 184,
+                    "source": "semantic_scholar",
+                    "query": "academic integrity graduate students",
+                    "cached": False,
+                }
+            ]
+        }
+    )
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Saved References
@@ -69,6 +96,46 @@ class SaveReferenceRequest(BaseModel):
 
     literature: LiteratureResult
     notes: Optional[str] = Field(default=None, max_length=2000)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "literature": {
+                        "title": "Academic integrity among graduate students in China",
+                        "authors": ["Wang, L.", "Liu, Y."],
+                        "year": 2021,
+                        "journal": "Journal of Academic Ethics",
+                        "abstract": "We surveyed 612 graduate students…",
+                        "doi": "10.1007/s10805-021-09412-7",
+                        "url": "https://doi.org/10.1007/s10805-021-09412-7",
+                        "source": "semantic_scholar",
+                        "external_id": "S2:212f3b9c1e",
+                        "keywords": ["academic integrity", "China"],
+                    },
+                    "notes": "Likely useful for the literature review chapter.",
+                }
+            ]
+        }
+    )
+
+
+_SAVED_REFERENCE_EXAMPLE = {
+    "id": "9f1e6c2a-4d2c-4a11-83b0-7384d9a84f3b",
+    "title": "Academic integrity among graduate students in China",
+    "authors": ["Wang, L.", "Liu, Y."],
+    "year": 2021,
+    "journal": "Journal of Academic Ethics",
+    "abstract": "We surveyed 612 graduate students…",
+    "doi": "10.1007/s10805-021-09412-7",
+    "url": "https://doi.org/10.1007/s10805-021-09412-7",
+    "source": "semantic_scholar",
+    "external_id": "S2:212f3b9c1e",
+    "keywords": ["academic integrity", "China"],
+    "is_saved": True,
+    "notes": "Likely useful for the literature review chapter.",
+    "created_at": "2026-09-15T10:23:00Z",
+}
 
 
 class SavedReferenceResponse(BaseModel):
@@ -89,7 +156,10 @@ class SavedReferenceResponse(BaseModel):
     notes: Optional[str] = None
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={"examples": [_SAVED_REFERENCE_EXAMPLE]},
+    )
 
 
 class SavedReferenceListResponse(BaseModel):
@@ -97,6 +167,14 @@ class SavedReferenceListResponse(BaseModel):
 
     items: list[SavedReferenceResponse]
     total: int
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"items": [_SAVED_REFERENCE_EXAMPLE], "total": 1}
+            ]
+        }
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -151,6 +229,68 @@ class ScaleCreateRequest(BaseModel):
     citations: Optional[list[ScaleCitation]] = None
     language: str = "zh"
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "学术诚信简表-中文版（ACI-CN-2019）",
+                    "discipline": "教育学",
+                    "description": "面向中国大学生的简化学术诚信测量量表",
+                    "items": [
+                        {
+                            "code": "Q1",
+                            "text": "我能识别哪些行为构成学术不端。",
+                            "reverse_scored": False,
+                        },
+                        {
+                            "code": "Q2",
+                            "text": "在压力下，偶尔抄袭是可以接受的。",
+                            "reverse_scored": True,
+                        },
+                    ],
+                    "cronbach_alpha": 0.86,
+                    "language": "zh",
+                }
+            ]
+        }
+    )
+
+
+_SCALE_RESPONSE_EXAMPLE = {
+    "id": "scale_aci_zh_2019",
+    "name": "学术诚信简表-中文版（ACI-CN-2019）",
+    "discipline": "教育学",
+    "description": "面向中国大学生的简化学术诚信测量量表",
+    "items": [
+        {
+            "code": "Q1",
+            "text": "我能识别哪些行为构成学术不端。",
+            "reverse_scored": False,
+        }
+    ],
+    "cronbach_alpha": 0.86,
+    "cronbach_alpha_history": [
+        {
+            "value": 0.86,
+            "sample_n": 612,
+            "year": 2019,
+            "citation": "Wang & Liu (2019)",
+        }
+    ],
+    "citations": [
+        {
+            "title": "Academic integrity among graduate students in China",
+            "authors": "Wang, L.; Liu, Y.",
+            "year": 2021,
+            "doi": "10.1007/s10805-021-09412-7",
+        }
+    ],
+    "language": "zh",
+    "source_type": "manual",
+    "created_at": "2026-09-01T08:00:00Z",
+    "updated_at": "2026-09-01T08:00:00Z",
+}
+
 
 class ScaleResponse(BaseModel):
     """Full scale detail response."""
@@ -168,7 +308,10 @@ class ScaleResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={"examples": [_SCALE_RESPONSE_EXAMPLE]},
+    )
 
 
 class ScaleSearchResponse(BaseModel):
@@ -176,6 +319,14 @@ class ScaleSearchResponse(BaseModel):
 
     results: list[ScaleResponse]
     total_count: int
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"results": [_SCALE_RESPONSE_EXAMPLE], "total_count": 1}
+            ]
+        }
+    )
 
 
 class ScaleImportRequest(BaseModel):
@@ -186,6 +337,17 @@ class ScaleImportRequest(BaseModel):
         default="end", description="Insert position: start | end | after:<question_id>"
     )
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "survey_id": "d3b07384-d9a8-4f3b-9f1e-6c2a4d2c8a11",
+                    "position": "after:q3",
+                }
+            ]
+        }
+    )
+
 
 class ScaleImportResponse(BaseModel):
     """Result of importing a scale into a survey."""
@@ -193,6 +355,18 @@ class ScaleImportResponse(BaseModel):
     survey_id: str
     items_added: int
     survey_json: dict
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "survey_id": "d3b07384-d9a8-4f3b-9f1e-6c2a4d2c8a11",
+                    "items_added": 5,
+                    "survey_json": {"pages": [{"name": "page1", "elements": []}]},
+                }
+            ]
+        }
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -220,7 +394,28 @@ class KnowledgeEntryResponse(BaseModel):
     language: str = "zh"
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "kb_pipl_consent_basics",
+                    "title": "PIPL 知情同意条款撰写要点",
+                    "category": "ethics",
+                    "content": {
+                        "markdown": (
+                            "# 知情同意要点\n\n"
+                            "1. 数据用途必须明确写出。\n"
+                            "2. 列出可能的接收方。\n"
+                        )
+                    },
+                    "tags": ["pipl", "consent"],
+                    "language": "zh",
+                    "created_at": "2026-09-01T08:00:00Z",
+                }
+            ]
+        },
+    )
 
 
 class KnowledgeEntrySearchResponse(BaseModel):
@@ -228,6 +423,27 @@ class KnowledgeEntrySearchResponse(BaseModel):
 
     results: list[KnowledgeEntryResponse]
     total_count: int
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "results": [
+                        {
+                            "id": "kb_pipl_consent_basics",
+                            "title": "PIPL 知情同意条款撰写要点",
+                            "category": "ethics",
+                            "content": None,
+                            "tags": ["pipl", "consent"],
+                            "language": "zh",
+                            "created_at": "2026-09-01T08:00:00Z",
+                        }
+                    ],
+                    "total_count": 1,
+                }
+            ]
+        }
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -243,6 +459,21 @@ class AiAssistedSearchRequest(BaseModel):
     )
     include_literature: bool = True
     include_scales: bool = True
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "topic": "学术诚信",
+                    "research_question": (
+                        "硕博研究生对学术诚信制度的认知是否随导师指导频率而变化？"
+                    ),
+                    "include_literature": True,
+                    "include_scales": True,
+                }
+            ]
+        }
+    )
 
 
 class AiExtractedScale(BaseModel):
@@ -262,6 +493,24 @@ class AiAssistedSearchResponse(BaseModel):
     model_used: str = ""
     tokens_used: int = 0
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "literature_findings": [],
+                    "related_scales": [_SCALE_RESPONSE_EXAMPLE],
+                    "ai_summary": (
+                        "已找到 1 个高相关量表（ACI-CN-2019）与 12 篇近 5 年文献。"
+                        "建议优先复用已验证量表。"
+                    ),
+                    "scales_ai_extracted": None,
+                    "model_used": "deepseek-chat",
+                    "tokens_used": 2840,
+                }
+            ]
+        }
+    )
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Scale Extraction
@@ -275,3 +524,15 @@ class ScaleExtractRequest(BaseModel):
     )
     doi: Optional[str] = Field(default=None, description="DOI to fetch and extract from")
     discipline: str = Field(default="psychology", description="Target discipline hint")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "text": None,
+                    "doi": "10.1007/s10805-021-09412-7",
+                    "discipline": "教育学",
+                }
+            ]
+        }
+    )

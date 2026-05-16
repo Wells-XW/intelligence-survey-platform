@@ -37,7 +37,18 @@ async def _get_service(db: AsyncSession = Depends(get_db)) -> PsychometricsServi
 # ── Split-Half Reliability ────────────────────────────────────────────
 
 
-@router.get("/{survey_id}/psychometrics/split-half", response_model=SplitHalfResult)
+@router.get(
+    "/{survey_id}/psychometrics/split-half",
+    response_model=SplitHalfResult,
+    summary="Compute split-half reliability",
+    description=(
+        "Compute split-half reliability with Spearman-Brown "
+        "correction for a Likert-scale block. Two split methods are "
+        "supported: ``odd_even`` (interleaved) and ``first_second`` "
+        "(sequential). When ``items`` is omitted the endpoint "
+        "auto-detects every rating-type question."
+    ),
+)
 async def get_split_half(
     survey_id: UUID,
     items: Optional[str] = Query(
@@ -68,6 +79,13 @@ async def get_split_half(
 @router.get(
     "/{survey_id}/psychometrics/item-total",
     response_model=ItemTotalCorrelationResult,
+    summary="Compute item-total correlations",
+    description=(
+        "Return corrected item-total correlations together with "
+        "alpha-if-deleted for each item. A negative or near-zero "
+        "correlation typically signals a reverse-coded or "
+        "miswritten item."
+    ),
 )
 async def get_item_total(
     survey_id: UUID,
@@ -95,6 +113,13 @@ async def get_item_total(
 @router.get(
     "/{survey_id}/psychometrics/kmo-bartlett",
     response_model=KmoBartlettResult,
+    summary="Compute KMO and Bartlett's test of sphericity",
+    description=(
+        "Compute the Kaiser-Meyer-Olkin (KMO) sampling adequacy "
+        "statistic and Bartlett's test of sphericity for a Likert "
+        "block. Useful for confirming the data is suitable for "
+        "exploratory factor analysis before running EFA."
+    ),
 )
 async def get_kmo_bartlett(
     survey_id: UUID,
@@ -122,6 +147,13 @@ async def get_kmo_bartlett(
 @router.post(
     "/{survey_id}/psychometrics/constructs",
     response_model=ConstructPsychometricsResult,
+    summary="Analyze multi-construct psychometrics",
+    description=(
+        "Compute item statistics, alpha, and pairwise correlations "
+        "for a set of named constructs supplied in the request "
+        "body. Used to validate convergent and discriminant "
+        "evidence on multi-factor scales."
+    ),
 )
 async def analyze_constructs(
     survey_id: UUID,
@@ -149,6 +181,14 @@ async def analyze_constructs(
 @router.get(
     "/{survey_id}/psychometrics/report",
     response_model=PsychometricReportResponse,
+    summary="Generate a comprehensive psychometric report",
+    description=(
+        "Bundle reliability, item-total, KMO/Bartlett, and "
+        "(optionally) construct analyses into a single APA-style "
+        "psychometric report. Pass ``include_constructs`` as a "
+        "JSON-encoded list of construct definitions to include "
+        "construct-level results."
+    ),
 )
 async def get_report(
     survey_id: UUID,
@@ -180,6 +220,13 @@ async def get_report(
 @router.get(
     "/{survey_id}/psychometrics/norm-comparison",
     response_model=ReliabilityNormComparisonResult,
+    summary="Compare scale reliability against published norms",
+    description=(
+        "Compare the observed scale's reliability against the "
+        "published norms catalogued in the knowledge-base scale "
+        "library. Filter the comparison set with ``discipline`` "
+        "and ``language`` so the benchmark fits the study context."
+    ),
 )
 async def compare_norms(
     survey_id: UUID,

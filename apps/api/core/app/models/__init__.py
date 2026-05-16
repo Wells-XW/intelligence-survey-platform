@@ -1,9 +1,11 @@
 from .ai_generation_log import AiGenerationLog
+from .api_key import ApiKey
 from .audit_log import AuditLog
 from .collaboration_invitation import CollaborationInvitation
 from .compliance_check import ComplianceCheck
 from .consent_record import ConsentRecord
 from .distribution import Distribution
+from .export_job import ExportJob
 from .knowledge_entry import KnowledgeEntry
 from .knowledge_scale import KnowledgeScale
 from .literature_reference import LiteratureReference
@@ -16,14 +18,18 @@ from .survey_permission import SurveyPermission
 from .survey_response import SurveyResponse
 from .survey_version import SurveyVersion
 from .user import User
+from .webhook_delivery import WebhookDelivery
+from .webhook_subscription import WebhookSubscription
 
 __all__ = [
     "AiGenerationLog",
+    "ApiKey",
     "AuditLog",
     "CollaborationInvitation",
     "ComplianceCheck",
     "ConsentRecord",
     "Distribution",
+    "ExportJob",
     "KnowledgeEntry",
     "KnowledgeScale",
     "LiteratureReference",
@@ -36,4 +42,6 @@ __all__ = [
     "SurveyResponse",
     "SurveyVersion",
     "User",
+    "WebhookDelivery",
+    "WebhookSubscription",
 ]
