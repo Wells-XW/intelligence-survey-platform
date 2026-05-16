@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from ...core.audit import log_audit
+from ...core.collaboration import manager as collab_manager
 from ...core.deps import check_survey_permission, get_current_user
 from ...database import get_db
 from ...models import Survey
@@ -187,6 +188,18 @@ async def restore_version(
 
     await db.commit()
     await db.refresh(survey)
+
+    # Notify live collaborators that the survey has changed.
+    actor_conn_id = (
+        request.headers.get("X-Collab-Connection-Id") if request else None
+    )
+    await collab_manager.broadcast_saved(
+        survey_id=sid,
+        version=survey.version,
+        actor_user_id=user.id,
+        actor_connection_id=actor_conn_id,
+        updated_at=survey.updated_at,
+    )
 
     return SurveyResponse.model_validate(survey)
 

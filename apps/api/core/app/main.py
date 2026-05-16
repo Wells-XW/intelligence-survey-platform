@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api.v1.ai import router as ai_router
 from .api.v1.analytics import router as analytics_router
 from .api.v1.auth import router as auth_router
+from .api.v1.collaboration_ws import router as collaboration_ws_router
 from .api.v1.compliance import router as compliance_router
 from .api.v1.distribution import router as distribution_router
 from .api.v1.distribution import public_router as distribution_public_router
@@ -79,3 +80,6 @@ app.include_router(survey_permissions_router, prefix="/api/v1")
 app.include_router(survey_invitations_router, prefix="/api/v1")
 app.include_router(invitations_standalone_router, prefix="/api/v1")
 app.include_router(user_search_router, prefix="/api/v1")
+
+# WebSocket — real-time collaboration (mounted at /api/v1/ws/...)
+app.include_router(collaboration_ws_router, prefix="/api/v1")

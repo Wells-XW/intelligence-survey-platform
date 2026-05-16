@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback } from 'react';
-import type { ICreatorOptions } from 'survey-creator-core';
 
 // SurveyJS Creator is loaded dynamically to handle its internal React dependency
 // We import CSS directly and use lazy loading for the JS bundle
@@ -9,15 +8,26 @@ import 'survey-creator-core/survey-creator-core.css';
 interface SurveyCreatorProps {
   surveyJson: Record<string, unknown>;
   onJsonChange: (json: Record<string, unknown>) => void;
+  /** Called whenever the user selects/deselects a question. */
+  onSelectedQuestionChange?: (questionId: string | null) => void;
 }
 
 /**
  * Wraps SurveyJS Survey Creator (drag-and-drop questionnaire designer).
  * Uses dynamic import to handle SurveyJS's React dependency correctly.
  */
-export function SurveyCreator({ surveyJson, onJsonChange }: SurveyCreatorProps) {
+export function SurveyCreator({
+  surveyJson,
+  onJsonChange,
+  onSelectedQuestionChange,
+}: SurveyCreatorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const creatorRef = useRef<unknown>(null);
+  // Hold the latest callback in a ref so async init can call current value.
+  const selectionRef = useRef(onSelectedQuestionChange);
+  useEffect(() => {
+    selectionRef.current = onSelectedQuestionChange;
+  }, [onSelectedQuestionChange]);
 
   const initCreator = useCallback(async () => {
     if (!containerRef.current) return;
@@ -84,6 +94,27 @@ export function SurveyCreator({ surveyJson, onJsonChange }: SurveyCreatorProps) 
         // Ignore parse errors during editing
       }
     });
+
+    // Forward selection changes to the parent (drives focus locks).
+    type SelectionSender = {
+      selectedElementName?: string;
+      selectedElement?: { name?: string; getType?: () => string };
+    };
+    creator.onSelectedElementChanged?.add?.(
+      (_: unknown, options: SelectionSender) => {
+        const cb = selectionRef.current;
+        if (!cb) return;
+        const el = options?.selectedElement;
+        // Treat survey/page-level selection as no focus.
+        const elType = el?.getType?.();
+        if (!el || elType === 'survey' || elType === 'page') {
+          cb(null);
+          return;
+        }
+        const name = el?.name || options?.selectedElementName;
+        cb(name ?? null);
+      },
+    );
 
     creatorRef.current = creator;
 
