@@ -16,5 +16,9 @@
   "packageManager": "pnpm@10.32.1",
   "engines": {
     "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "survey-core": "^2.5.24",
+    "survey-creator-core": "^2.5.24"
   }
 }

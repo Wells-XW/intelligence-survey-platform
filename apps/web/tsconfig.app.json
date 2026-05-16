@@ -21,6 +21,9 @@
       "@/*": ["src/*"]
     },
 
+    /* TS 7.0 migration */
+    "ignoreDeprecations": "6.0",
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

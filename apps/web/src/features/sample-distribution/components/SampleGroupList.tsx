@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, ChevronDown, Upload, UserPlus } from 'lucide-react';
-import toast from 'sonner';
+import { toast } from 'sonner';
 import {
   getSampleGroups,
   createSampleGroup,

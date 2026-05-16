@@ -4,7 +4,6 @@ import { Shield, RefreshCw, FileText, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useEthicsStore } from '@/features/ethics/store';
 import {
   EthicsChecklist,
@@ -16,9 +15,6 @@ import {
   runComplianceScan,
   getComplianceReport,
   getComplianceHistory,
-  type ComplianceCheckResponse,
-  type ComplianceReportResponse,
-  type ComplianceHistoryResponse,
 } from '@/lib/api';
 
 export function EthicsCompliancePage() {

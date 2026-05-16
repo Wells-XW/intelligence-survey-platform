@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Pause, Play } from 'lucide-react';
-import toast from 'sonner';
+import { toast } from 'sonner';
 import {
   getQuotas,
   createQuota,
   updateQuota,
   deleteQuota,
-  type QuotaDefinition,
 } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

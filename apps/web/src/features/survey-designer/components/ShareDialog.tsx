@@ -11,8 +11,6 @@ import {
   revokeInvitation,
   getInvitations,
   searchUsers,
-  type PermissionDetail,
-  type InvitationResponse,
   type UserSearchItem,
 } from '@/lib/api';
 import { useDesignerStore } from '@/features/survey-designer/store';
@@ -42,7 +40,6 @@ interface ShareDialogProps {
 export function ShareDialog({ surveyId }: ShareDialogProps) {
   const isOpen = useDesignerStore((s) => s.isShareDialogOpen);
   const setOpen = useDesignerStore((s) => s.setShareDialogOpen);
-  const queryClient = useQueryClient();
 
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>

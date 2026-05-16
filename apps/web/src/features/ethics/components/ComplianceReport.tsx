@@ -9,7 +9,6 @@ interface ComplianceReportProps {
 
 export function ComplianceReport({
   reportMarkdown,
-  surveyTitle,
   generatedAt,
 }: ComplianceReportProps) {
   return (
@@ -48,7 +47,6 @@ export function ComplianceReport({
             }
             if (line.startsWith('- ') || line.startsWith('* ')) {
               const content = line.slice(2);
-              const isBold = content.startsWith('**');
               return (
                 <div key={i} className="ml-4 flex items-start gap-2 text-sm">
                   <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-muted-foreground" />

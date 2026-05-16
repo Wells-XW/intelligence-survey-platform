@@ -18,9 +18,6 @@ import {
   analyzeConstructs,
   getPsychometricReport,
   compareReliabilityNorms,
-  type SplitHalfResult,
-  type ItemTotalCorrelationResult,
-  type KmoBartlettResult,
   type ConstructPsychometricsResult,
   type PsychometricReportResponse,
   type ReliabilityNormComparisonResult,
@@ -34,12 +31,6 @@ import {
   PsychometricReport,
   ReliabilityComparison,
 } from '@/features/psychometrics/components';
-
-// Mock: fetch available Likert items from survey
-// In production, this would be a proper API call or derived from analytics summary
-function extractLikertItems(items: Array<{ name: string; title: string }>) {
-  return items;
-}
 
 export function MeasurementToolkitPage() {
   const { id: surveyId } = useParams<{ id: string }>();
@@ -148,13 +139,6 @@ export function MeasurementToolkitPage() {
       setReportLoading(false);
     }
   }, [surveyId, itemsStr, store]);
-
-  // Norm comparison query
-  const normQuery = useQuery({
-    queryKey: [...commonQueryKey, 'norm-comparison'],
-    queryFn: () => compareReliabilityNorms(surveyId!, itemsStr || undefined),
-    enabled: false, // manual trigger
-  });
 
   const [normResult, setNormResult] = useState<ReliabilityNormComparisonResult | null>(null);
   const [normLoading, setNormLoading] = useState(false);

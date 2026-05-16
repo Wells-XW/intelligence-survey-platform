@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Users, CheckCircle, SendHorizonal, Target } from 'lucide-react';
-import { getDistributionDashboard, type DistributionDashboard } from '@/lib/api';
+import { getDistributionDashboard } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';

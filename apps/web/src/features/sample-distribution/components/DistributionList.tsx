@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Send, BellRing, Eye } from 'lucide-react';
-import toast from 'sonner';
+import { toast } from 'sonner';
 import {
   getDistributions,
   getSampleGroups,
   createDistribution,
   sendDistribution,
   remindDistribution,
-  type DistributionCampaign,
-  type SampleGroup,
 } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -219,7 +217,7 @@ export function DistributionList({ surveyId }: Props) {
               {expandedId === d.id && (
                 <div className="mt-3 pt-3 border-t text-sm text-muted-foreground space-y-1">
                   <p>
-                    样本组: {d.sample_group_name || d.sample_group_id.slice(0, 8)}
+                    样本组: {d.sample_group_id.slice(0, 8)}
                   </p>
                   <p>创建时间: {new Date(d.created_at).toLocaleString('zh-CN')}</p>
                 </div>

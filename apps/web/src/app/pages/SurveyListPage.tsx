@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, MoreVertical, Trash2, Copy, BarChart3, Send, ExternalLink } from 'lucide-react';
+import { Plus, FileText, MoreVertical, Trash2, Copy, BarChart3, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, type SurveyListItem } from '@/lib/api';
 import { Button } from '@/components/ui/button';

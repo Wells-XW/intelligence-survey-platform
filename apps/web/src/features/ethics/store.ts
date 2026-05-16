@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ComplianceCheckResponse, ComplianceHistoryResponse, ComplianceReportResponse } from '@/lib/api';
+import type { ComplianceCheckResponse, ComplianceReportResponse } from '@/lib/api';
 
 interface EthicsState {
   // Current scan result

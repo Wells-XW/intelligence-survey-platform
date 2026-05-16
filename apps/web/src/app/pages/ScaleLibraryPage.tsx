@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Library, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,12 +40,17 @@ export default function ScaleLibraryPage() {
   };
 
   // Load on mount
-  useQuery({
+  const { data: scalesInitialData } = useQuery({
     queryKey: ['scales', scaleDiscipline],
     queryFn: () => searchScales({ discipline: scaleDiscipline || undefined, limit: 30 }),
-    onSuccess: (data: { results: ScaleResponse[]; total_count: number }) => setScales(data.results, data.total_count),
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    if (scalesInitialData) {
+      setScales(scalesInitialData.results, scalesInitialData.total_count);
+    }
+  }, [scalesInitialData, setScales]);
 
   return (
     <div className="space-y-6">

@@ -16,7 +16,6 @@ export function ConstructBuilder({ onAnalyze, isAnalyzing }: Props) {
     constructs,
     addConstruct,
     removeConstruct,
-    addItemToConstruct,
     removeItemFromConstruct,
   } = usePsychometricsStore();
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, Download, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import { Download, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import type {
@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   BarChart,
-  PieChart,
   HeatmapChart,
   ResponseDataTable,
   QualityIndicators,
@@ -32,8 +31,6 @@ import {
   ANALYTICS_TABS,
   useAnalyticsStore,
 } from '@/features/analytics/store';
-
-type TabKey = 'summary' | 'crosstab' | 'reliability' | 'quality';
 
 function useAnalyticsSummary(surveyId: string) {
   return useQuery({
@@ -449,7 +446,14 @@ function ReliabilityTab({
       ) : results && results.length > 0 ? (
         <div className="space-y-3">
           {results.map((r) => (
-            <CronbachDisplay key={r.scale_name} {...r} />
+            <CronbachDisplay
+              key={r.scale_name}
+              scaleName={r.scale_name}
+              items={r.items}
+              alpha={r.alpha}
+              interpretation={r.interpretation}
+              nValidResponses={r.n_valid_responses}
+            />
           ))}
         </div>
       ) : (

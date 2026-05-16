@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GraduationCap, Bookmark, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,16 +18,21 @@ const TABS = [
 type TabKey = typeof TABS[number]['key'];
 
 export default function KnowledgeBasePage() {
-  const { entryResults, entryTotal, setEntries, entryCategory, setEntryCategory } = useKnowledgeBaseStore();
+  const { entryResults, setEntries, entryCategory, setEntryCategory } = useKnowledgeBaseStore();
   const [activeTab, setActiveTab] = useState<TabKey>('saved');
   const [selectedEntry, setSelectedEntry] = useState<KnowledgeEntryResponse | null>(null);
 
-  const { isLoading: entriesLoading } = useQuery({
+  const { isLoading: entriesLoading, data: entriesData } = useQuery({
     queryKey: ['entries', entryCategory],
     queryFn: () => searchEntries({ category: entryCategory || undefined, limit: 30 }),
-    onSuccess: (data: { results: KnowledgeEntryResponse[]; total_count: number }) => setEntries(data.results, data.total_count),
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    if (entriesData) {
+      setEntries(entriesData.results, entriesData.total_count);
+    }
+  }, [entriesData, setEntries]);
 
   return (
     <div className="space-y-6">

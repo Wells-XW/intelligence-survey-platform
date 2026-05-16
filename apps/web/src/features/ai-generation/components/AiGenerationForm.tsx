@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useAiGenerationStore } from '../store';
 import { estimateAiCost, generateSurveyStream } from '@/lib/api';
-import type { AiCostEstimate } from '@/lib/api';
 
 interface Props {
   onGenerateStart: () => void;

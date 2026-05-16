@@ -4,7 +4,6 @@ import type {
   AiGenerationResponse,
   AiCostEstimate,
   SseProgressEvent,
-  SqpQualitySummary,
 } from '@/lib/api';
 
 interface AiGenerationState {

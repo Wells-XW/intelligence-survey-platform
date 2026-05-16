@@ -1,14 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Model } from 'survey-core';
 import { Survey } from 'survey-react-ui';
-import 'survey-core/defaultV2.min.css';
+import 'survey-core/survey-core.css';
 import { api } from '@/lib/api';
 import type { Survey as SurveyType } from '@/lib/api';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 

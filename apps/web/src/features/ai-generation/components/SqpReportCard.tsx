@@ -12,14 +12,6 @@ const QUALITY_LABELS: Record<string, string> = {
   'needs-redesign': '需要重设计',
 };
 
-const ALPHA_COLORS: Record<string, string> = {
-  excellent: 'text-emerald-600',
-  good: 'text-emerald-600',
-  acceptable: 'text-amber-600',
-  questionable: 'text-orange-600',
-  poor: 'text-red-600',
-};
-
 function interpretAlpha(alpha: number): { label: string; color: string } {
   if (alpha >= 0.9) return { label: 'Excellent', color: 'text-emerald-600' };
   if (alpha >= 0.8) return { label: 'Good', color: 'text-emerald-600' };

@@ -9,7 +9,6 @@ import {
   diffVersions,
   type VersionListItem,
   type VersionDetail,
-  type VersionDiffResponse,
 } from '@/lib/api';
 import { useDesignerStore } from '@/features/survey-designer/store';
 import { Button } from '@/components/ui/button';

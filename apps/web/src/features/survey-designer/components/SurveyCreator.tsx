@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback } from 'react';
-import type { ICreatorOptions } from 'survey-creator-core';
 
 // SurveyJS Creator is loaded dynamically to handle its internal React dependency
 // We import CSS directly and use lazy loading for the JS bundle
@@ -23,13 +22,7 @@ export function SurveyCreator({ surveyJson, onJsonChange }: SurveyCreatorProps) 
     if (!containerRef.current) return;
 
     // Dynamic import to avoid SSR issues and handle React dependency
-    const [
-      { SurveyCreator: SurveyCreatorClass },
-      { SurveyCreatorComponent },
-    ] = await Promise.all([
-      import('survey-creator-core'),
-      import('survey-creator-react'),
-    ]);
+    const { SurveyCreator, SurveyCreatorComponent } = await import('survey-creator-react');
 
     // Clean up previous instance
     if (creatorRef.current) {
@@ -64,7 +57,7 @@ export function SurveyCreator({ surveyJson, onJsonChange }: SurveyCreatorProps) 
       // Custom localization for Chinese academic context
     };
 
-    const creator = new SurveyCreatorClass(options);
+    const creator = new SurveyCreator(options);
 
     // Set initial JSON
     if (surveyJson && Object.keys(surveyJson).length > 0) {
