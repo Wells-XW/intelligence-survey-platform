@@ -354,9 +354,9 @@ class WebhookSubscriptionRotateOut(WebhookSubscriptionOut):
     Identical shape to :class:`WebhookSubscriptionCreateOut`: the
     rotated subscription carries a fresh ``signing_secret`` while
     ``id`` and target metadata remain stable. The previous secret's
-    hash is moved to ``previous_secret_hash`` server-side during the
-    rotation invalidation window per Req 3 AC5; that column is never
-    exposed to clients.
+    ciphertext is moved to ``previous_secret_ciphertext`` server-side
+    during the rotation invalidation window per Req 3 AC5; that
+    column is never exposed to clients.
 
     Attributes:
         signing_secret: New plaintext signing secret, returned exactly

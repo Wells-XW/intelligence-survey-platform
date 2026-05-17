@@ -28,15 +28,17 @@ Retry semantics:
     (Req 4.7).
 
 Plaintext signing-secret column:
-    The schema column ``WebhookSubscription.signing_secret_hash`` was named
-    during an early design draft when we expected to verify a credential
-    presented by the receiver. That pattern does not apply to outbound
-    HMAC signing: the worker must hold the plaintext secret to compute
-    ``HMAC-SHA256(secret, body)``, since SHA-256 is one-way. The column
-    therefore stores the plaintext value directly; the ``_hash`` suffix is
-    a misnomer that survives only because renaming the column would force
-    another Alembic migration (deferred). Treat reads from
-    ``signing_secret_hash`` as plaintext throughout this module.
+    The persistence column ``WebhookSubscription.signing_secret_ciphertext``
+    stores the Fernet ciphertext of the current signing secret, not
+    the plaintext and not a hash. Outbound HMAC signing requires the
+    plaintext (SHA-256 is one-way), so the worker reverses the
+    encryption with
+    :func:`app.core.webhook_secret_crypto.decrypt_signing_secret`
+    before feeding the secret into
+    :func:`app.core.webhook_signing.sign`. This satisfies both
+    Req 4 AC3 (HMAC-SHA256 keyed by the current signing secret) and
+    Property 1 (plaintext credential exposure exactly-once on the
+    persistence surface).
 
 Idempotency:
     The receiver gets the delivery's UUID in ``X-Webhook-Delivery``. It is
@@ -82,6 +84,7 @@ from sqlalchemy import select
 from . import celery_app
 from ..config import settings
 from ..core.audit import log_audit
+from ..core.webhook_secret_crypto import decrypt_signing_secret
 from ..core.webhook_signing import (
     build_delivery_headers,
     canonical_body_bytes,
@@ -159,13 +162,13 @@ def reconcile_pending_deliveries() -> None:
     default_retry_delay=60,
 )
 def invalidate_previous_secret(self, subscription_id: str) -> None:
-    """Clear ``previous_secret_hash`` after the rotation grace window.
+    """Clear ``previous_secret_ciphertext`` after the rotation grace window.
 
     Called via ``apply_async(countdown=PREVIOUS_SECRET_GRACE_SECONDS)``
     from the rotate-secret route. Marks the previous secret invalid by
-    setting ``previous_secret_hash = None`` for the subscription so the
-    delivery worker stops accepting it as a fallback signing key
-    (Req 3 AC5).
+    setting ``previous_secret_ciphertext = None`` for the subscription
+    so the delivery worker stops accepting it as a fallback signing
+    key (Req 3 AC5).
 
     At-least-once semantics: if any database error occurs the task
     re-raises through Celery's ``self.retry(exc=...)`` up to
@@ -177,8 +180,8 @@ def invalidate_previous_secret(self, subscription_id: str) -> None:
     converge on the same final state.
 
     Args:
-        subscription_id: The subscription whose previous secret hash
-            should be cleared.
+        subscription_id: The subscription whose previous secret
+            ciphertext should be cleared.
     """
     asyncio.run(_async_invalidate_previous_secret(self, subscription_id))
 
@@ -234,13 +237,16 @@ async def _async_deliver_webhook(delivery_id: str) -> None:
             await db.commit()
             return
 
-        # Build the canonical body and signature using the plaintext
-        # signing secret stored in the (misnamed) ``signing_secret_hash``
-        # column; see the module docstring for the rationale.
+        # Build the canonical body and signature. The signing secret
+        # is held at rest as Fernet ciphertext in
+        # ``signing_secret_ciphertext``; reverse the encryption here
+        # so :func:`sign` (HMAC-SHA256) can run against the plaintext
+        # bytes per Req 4 AC3.
         body_bytes = canonical_body_bytes(delivery.payload)
-        signature_header = sign(
-            secret=sub.signing_secret_hash, body_bytes=body_bytes
+        plaintext_secret = decrypt_signing_secret(
+            sub.signing_secret_ciphertext
         )
+        signature_header = sign(secret=plaintext_secret, body_bytes=body_bytes)
         headers = build_delivery_headers(
             event_type=delivery.event_type,
             delivery_id=delivery.id,
@@ -512,25 +518,25 @@ async def _terminate_failed(
 async def _async_invalidate_previous_secret(
     task_ctx, subscription_id: str
 ) -> None:
-    """Async body: clear ``previous_secret_hash`` with at-least-once retry.
+    """Async body: clear ``previous_secret_ciphertext`` with at-least-once retry.
 
     Issues a single ``UPDATE webhook_subscriptions SET
-    previous_secret_hash = NULL WHERE id = :sub_id``. The statement is
-    naturally idempotent — if the column is already ``None`` because a
-    later rotation cleared it or a previous invalidation already ran,
-    the row count is zero and the task still succeeds. On any
-    exception during the write the task asks Celery to retry with
-    exponential backoff (60 s base, doubled per retry, capped by
-    ``max_retries=10`` on the bound task), preserving at-least-once
-    semantics.
+    previous_secret_ciphertext = NULL WHERE id = :sub_id``. The
+    statement is naturally idempotent — if the column is already
+    ``None`` because a later rotation cleared it or a previous
+    invalidation already ran, the row count is zero and the task
+    still succeeds. On any exception during the write the task asks
+    Celery to retry with exponential backoff (60 s base, doubled per
+    retry, capped by ``max_retries=10`` on the bound task), preserving
+    at-least-once semantics.
 
     Args:
         task_ctx: The bound Celery task instance (``self`` from the
             wrapper) used to call :meth:`Task.retry` and surface
             ``MaxRetriesExceededError`` if the retry budget is
             exhausted.
-        subscription_id: The subscription whose previous secret hash
-            should be cleared.
+        subscription_id: The subscription whose previous secret
+            ciphertext should be cleared.
     """
     from sqlalchemy import update
 
@@ -541,7 +547,7 @@ async def _async_invalidate_previous_secret(
             await db.execute(
                 update(WebhookSubscription)
                 .where(WebhookSubscription.id == subscription_id)
-                .values(previous_secret_hash=None)
+                .values(previous_secret_ciphertext=None)
             )
             await db.commit()
     except Exception as exc:  # noqa: BLE001 — retry on any DB error

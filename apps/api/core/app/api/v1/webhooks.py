@@ -14,9 +14,13 @@ which rejects principals whose ``api_key`` attribute is non-null with a
 unchanged.
 
 The plaintext signing secret is returned to the client exactly once —
-at creation and at rotation — and is never persisted; only its SHA-256
-hash is stored in :attr:`WebhookSubscription.signing_secret_hash`. List,
-update, delete, and history responses never carry the plaintext.
+at creation and at rotation — and is never persisted in plaintext.
+The persistence column ``signing_secret_ciphertext`` holds the Fernet
+ciphertext produced by
+:func:`app.core.webhook_secret_crypto.encrypt_signing_secret`; the
+delivery worker decrypts on demand to compute outbound HMAC signatures
+per Req 4 AC3. List, update, delete, and history responses never carry
+the plaintext.
 
 Soft-delete semantics:
     The ``DELETE`` route flips ``active`` to ``False`` rather than
@@ -29,7 +33,7 @@ Soft-delete semantics:
 from __future__ import annotations
 
 import secrets
-from typing import List, Tuple
+from typing import List
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -42,6 +46,7 @@ from ...core.deps import (
     check_survey_permission,
     get_principal,
 )
+from ...core.webhook_secret_crypto import encrypt_signing_secret
 from ...database import get_db
 from ...models.webhook_delivery import WebhookDelivery
 from ...models.webhook_subscription import WebhookSubscription
@@ -181,37 +186,31 @@ def _validate_event_types(event_types: List[str]) -> None:
         )
 
 
-def _generate_signing_secret() -> Tuple[str, str]:
-    """Generate a fresh signing secret and the value to persist for signing.
+def _generate_signing_secret() -> str:
+    """Generate a fresh plaintext webhook signing secret.
 
     The plaintext format is ``whsec_<32 url-safe base64 characters>``,
     drawn from :func:`secrets.token_urlsafe(24)` (which yields ~32
     characters of base64 over 192 bits of entropy). The prefix is
-    fixed so receivers can flag leaked secrets the same way Stripe /
-    GitHub style prefixes are flagged in scanning tools.
+    fixed so receivers' log scrubbers and credential scanners can
+    flag a leaked secret the same way Stripe / GitHub style prefixes
+    are flagged.
 
-    Persisted value note:
-        The schema column ``WebhookSubscription.signing_secret_hash``
-        was named during an early design draft when we expected to
-        verify a credential presented by the receiver. That pattern
-        does not apply to outbound HMAC signing: the worker must hold
-        the plaintext to compute ``HMAC-SHA256(secret, body)``,
-        because SHA-256 is one-way. The column therefore stores the
-        plaintext value directly and the ``_hash`` suffix is a
-        misnomer that survives only because renaming the column would
-        require another Alembic migration (deferred). See
-        :mod:`app.tasks.webhook_tasks` module docstring for the
-        receiver-side implication.
+    Persistence note:
+        The plaintext returned here is surfaced to the caller exactly
+        once at create or rotate time. The route layer encrypts it
+        via :func:`app.core.webhook_secret_crypto.encrypt_signing_secret`
+        before storing in
+        ``WebhookSubscription.signing_secret_ciphertext``; the worker
+        decrypts on demand to compute outbound HMAC signatures. The
+        plaintext bytes never reach the persistence layer, satisfying
+        Property 1 (plaintext credential exposure exactly-once) for
+        the webhook clause.
 
     Returns:
-        A ``(plaintext, persisted_value)`` pair where the second
-        element is the same plaintext, returned as a separate name
-        to keep call sites explicit about persistence intent. The
-        plaintext is surfaced to the user exactly once at create or
-        rotate time.
+        The plaintext signing secret.
     """
-    plaintext = _SECRET_PREFIX + secrets.token_urlsafe(24)
-    return plaintext, plaintext
+    return _SECRET_PREFIX + secrets.token_urlsafe(24)
 
 
 async def _load_owned_subscription(
@@ -371,8 +370,9 @@ async def create_webhook_subscription(
     least viewer permission on that survey; the same RBAC gate that
     governs read access to the survey gates registration of webhook
     subscriptions targeting it. Generates a fresh plaintext signing
-    secret via :func:`_generate_signing_secret`, stores only its
-    SHA-256 hash, and returns the plaintext exactly once. Emits a
+    secret via :func:`_generate_signing_secret`, encrypts it with
+    :func:`encrypt_signing_secret`, stores the resulting Fernet
+    ciphertext, and returns the plaintext exactly once. Emits a
     ``webhook.subscription.create`` audit row whose ``details`` carry
     the new subscription id, the target URL, and the event-type list.
 
@@ -403,7 +403,8 @@ async def create_webhook_subscription(
         # survey-scoped route in the platform.
         await check_survey_permission(body.survey_id, principal.user, "viewer", db)
 
-    plaintext, persisted_value = _generate_signing_secret()
+    plaintext = _generate_signing_secret()
+    ciphertext = encrypt_signing_secret(plaintext)
 
     row = WebhookSubscription(
         user_id=principal.user.id,
@@ -411,7 +412,7 @@ async def create_webhook_subscription(
         target_url=body.target_url,
         event_types=list(body.event_types),
         description=body.description,
-        signing_secret_hash=persisted_value,
+        signing_secret_ciphertext=ciphertext,
         active=True,
     )
     db.add(row)
@@ -578,13 +579,14 @@ async def rotate_webhook_secret(
 ) -> WebhookSubscriptionRotateOut:
     """Rotate the signing secret on an existing subscription.
 
-    Generates a fresh plaintext, moves the current
-    ``signing_secret_hash`` into ``previous_secret_hash`` to open the
-    rotation invalidation window described in Req 3 AC5, persists the
-    new hash, and returns the new plaintext exactly once. The
-    background invalidation task scheduled in Task 8.2 clears
-    ``previous_secret_hash`` once the previous secret is no longer
-    accepted by the worker. Emits a
+    Generates a fresh plaintext, encrypts it via
+    :func:`encrypt_signing_secret`, moves the current
+    ``signing_secret_ciphertext`` into ``previous_secret_ciphertext`` to
+    open the rotation invalidation window described in Req 3 AC5,
+    persists the new ciphertext, and returns the new plaintext exactly
+    once. The background invalidation task scheduled in Task 8.2 clears
+    ``previous_secret_ciphertext`` once the previous secret is no
+    longer accepted by the worker. Emits a
     ``webhook.subscription.rotate_secret`` audit row.
 
     Args:
@@ -603,15 +605,16 @@ async def rotate_webhook_secret(
     """
     row = await _load_owned_subscription(sub_id, principal, db)
 
-    new_plaintext, new_persisted_value = _generate_signing_secret()
-    # Move the previously persisted secret into the rotation
+    new_plaintext = _generate_signing_secret()
+    new_ciphertext = encrypt_signing_secret(new_plaintext)
+    # Move the previously persisted ciphertext into the rotation
     # invalidation slot so the receiver-side dual-acceptance window
     # (Req 3 AC5) and the background invalidation task can coordinate
     # per design §Component 4. The delivery worker always signs with
     # the new secret. The slot is cleared by the invalidation task
     # once the previous secret is no longer accepted.
-    row.previous_secret_hash = row.signing_secret_hash
-    row.signing_secret_hash = new_persisted_value
+    row.previous_secret_ciphertext = row.signing_secret_ciphertext
+    row.signing_secret_ciphertext = new_ciphertext
     await db.flush()
 
     await log_audit(

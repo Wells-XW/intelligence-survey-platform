@@ -143,7 +143,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Insert one `WebhookDelivery` per match in status `pending` inside the caller's DB transaction; enqueue Celery `deliver_webhook(delivery_id)` after commit.
     - Wire emitter into the existing handlers per design §Component 3: `app/api/v1/responses.py` (response.created, response.completed), `app/services/sample_service.py` (quota.reached), `app/api/v1/distribution.py` (distribution.sent).
     - _Requirements: 4.1_
-  - [-]* 7.4 Property test P1 (webhook portion): plaintext exposure exactly-once for signing secret
+  - [x]* 7.4 Property test P1 (webhook portion): plaintext exposure exactly-once for signing secret
     - **Property 1: Plaintext credential exposure is exactly-once (webhook clause)**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 3.1, 3.4**
@@ -391,6 +391,50 @@ Property tasks reference design properties P1 through P25 and the requirements c
 
 - [x] 19. Final checkpoint: Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+
+## Post-T15 fix: encrypt webhook signing secret at rest
+
+Resolves the conflict between Req 3 AC3 (store secret only as a salted
+hash) and Req 4 AC3 (HMAC-SHA256 keyed by the current signing secret
+over the request body) by storing the secret as Fernet ciphertext at
+rest. The original implementation chose plaintext to satisfy Req 4 AC3,
+which violated Property 1 (plaintext credential exposure is
+exactly-once); the encrypted-at-rest design lets the worker decrypt on
+demand to compute HMAC signatures while keeping plaintext bytes off
+the persistence surface.
+
+- [x] PT15.1 Add ``WEBHOOK_SECRET_ENCRYPTION_KEY`` setting and the
+  ``app.core.webhook_secret_crypto`` helper module
+  (``encrypt_signing_secret`` / ``decrypt_signing_secret``); document
+  the deterministic dev key in ``.env.example``.
+- [x] PT15.2 Alembic 0012 renames
+  ``webhook_subscriptions.signing_secret_hash`` →
+  ``signing_secret_ciphertext`` and
+  ``previous_secret_hash`` → ``previous_secret_ciphertext`` and
+  widens both columns to ``VARCHAR(512)``.
+- [x] PT15.3 Update model, routes, and worker to encrypt on write and
+  decrypt before HMAC signing; rename test column-presence guards.
+- [x] PT15.4 Re-run task 7.4's property test P1 (webhook clause); it
+  now passes (the column scan no longer finds plaintext bytes).
+
+### Production data-migration follow-up (out of scope for the dev fix)
+
+Migration 0012 intentionally skips re-encrypting existing rows because
+the dev environment has no production data to preserve. Production
+deployments must run a one-off data-migration script before applying
+0012:
+
+1. Read each row's plaintext from
+   ``webhook_subscriptions.signing_secret_hash`` (assumed plaintext
+   under the buggy implementation).
+2. Encrypt with
+   :func:`app.core.webhook_secret_crypto.encrypt_signing_secret`.
+3. ``UPDATE webhook_subscriptions SET signing_secret_ciphertext = :ct``
+   after the rename.
+4. Repeat for ``previous_secret_hash`` rows that are non-null.
+
+This work item is tracked here so it surfaces during the next
+production-deployment review rather than landing as a surprise.
 
 ## Notes
 

@@ -86,6 +86,28 @@ class Settings(BaseSettings):
     # key has never been used).
     api_key_inactivity_threshold_days: int = 90
 
+    # ------------------------------------------------------------------
+    # post-T15 fix: encrypt webhook signing secret at rest
+    # ------------------------------------------------------------------
+    # Symmetric encryption key used by ``app.core.webhook_secret_crypto``
+    # to wrap webhook subscription signing secrets before they are
+    # persisted to ``webhook_subscriptions.signing_secret_ciphertext``.
+    # The key is a base64 url-safe encoding of 32 raw bytes (the format
+    # produced by :meth:`cryptography.fernet.Fernet.generate_key`); any
+    # non-conforming value will raise at first encrypt/decrypt.
+    #
+    # The default below is a deterministic dev/test key, frozen so the
+    # local test suite and ``.env.example`` can roundtrip without each
+    # developer minting their own. Production deployments MUST override
+    # this via the ``WEBHOOK_SECRET_ENCRYPTION_KEY`` environment
+    # variable; rotation requires re-encrypting every existing row in
+    # ``webhook_subscriptions`` (out of scope for the dev-environment
+    # fix that introduced this column — see migration 0012's
+    # docstring for the production migration guidance).
+    webhook_secret_encryption_key: str = (
+        "Ir9qFm3aDOlpXweqvJnp9La2iMk4CltGf1fuqhprGy4="
+    )
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

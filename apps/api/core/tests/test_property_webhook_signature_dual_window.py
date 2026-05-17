@@ -3,9 +3,9 @@
 Per design §Property 3 (Requirements 4.2, 4.10, with the dual-window
 invariant pinned by Req 3.5), a webhook subscription enters a
 dual-acceptance window the moment ``rotate_webhook_secret`` runs. While
-the column ``WebhookSubscription.previous_secret_hash`` is non-null, the
-receiver-side verification simulator accepts payloads signed with
-either the previous or the current signing secret. Once
+the column ``WebhookSubscription.previous_secret_ciphertext`` is
+non-null, the receiver-side verification simulator accepts payloads
+signed with either the previous or the current signing secret. Once
 ``_async_invalidate_previous_secret`` clears that column — which it may
 do only after some number of at-least-once retry failures — only
 signatures produced with the current secret continue to verify.
@@ -66,12 +66,15 @@ class _SubscriptionState:
     """Minimal projection of the columns that drive the dual-window.
 
     Captures the two columns relevant to receiver-side verification —
-    ``signing_secret_hash`` (the current secret, stored as plaintext
-    despite the misnamed column; see
-    :mod:`app.tasks.webhook_tasks` module docstring) and the optional
-    ``previous_secret_hash`` (set during the rotation invalidation
-    window). Using a dataclass instead of a full ORM row keeps the
-    test pure-function.
+    ``signing_secret_ciphertext`` (the current secret, stored as
+    Fernet ciphertext at rest and decrypted by the worker before
+    HMAC signing; see :mod:`app.tasks.webhook_tasks` module
+    docstring) and the optional ``previous_secret_ciphertext`` (set
+    during the rotation invalidation window). Using a dataclass
+    instead of a full ORM row keeps the test pure-function: this
+    state holds the **plaintext** secrets directly so the simulator
+    can verify HMAC signatures without round-tripping through
+    encryption.
     """
 
     current_secret: str
@@ -180,22 +183,23 @@ def test_p3_dual_window_holds_during_invalidation_failures(
     secret_new: str,
     invalidation_failure_count: int,
 ) -> None:
-    """Both secrets verify while ``previous_secret_hash`` is non-null.
+    """Both secrets verify while ``previous_secret_ciphertext`` is non-null.
 
     Models the rotate-then-invalidate state machine that the route
     :func:`app.api.v1.webhooks.rotate_webhook_secret` and the task
     :func:`app.tasks.webhook_tasks._async_invalidate_previous_secret`
     drive together:
 
-    1. Rotation runs: ``signing_secret_hash`` becomes ``secret_new``;
-       ``previous_secret_hash`` becomes ``secret_old``. The receiver
-       simulator caches both.
+    1. Rotation runs: ``signing_secret_ciphertext`` becomes a Fernet
+       ciphertext of ``secret_new``; ``previous_secret_ciphertext``
+       becomes a Fernet ciphertext of ``secret_old``. The receiver
+       simulator caches both plaintext secrets.
     2. The invalidation task fails ``invalidation_failure_count``
        times under the at-least-once retry contract (max ten
        retries). Each failure leaves both columns unchanged because
        :func:`_async_invalidate_previous_secret` only commits its
        ``UPDATE`` after a successful execution.
-    3. While ``previous_secret_hash`` is non-null, the receiver
+    3. While ``previous_secret_ciphertext`` is non-null, the receiver
        simulator must accept signatures produced with **either**
        secret. This is the load-bearing dual-window invariant
        (Req 3.5): a delivery already in-flight at rotation time and
@@ -225,9 +229,9 @@ def test_p3_dual_window_holds_during_invalidation_failures(
 
     # Step 2: simulate ``invalidation_failure_count`` failed retries.
     # Each retry leaves the columns unchanged because the task only
-    # commits ``UPDATE … SET previous_secret_hash = NULL`` on success;
-    # an exception path falls through ``Task.retry(exc=…)`` without a
-    # commit. The column state is therefore loop-invariant.
+    # commits ``UPDATE … SET previous_secret_ciphertext = NULL`` on
+    # success; an exception path falls through ``Task.retry(exc=…)``
+    # without a commit. The column state is therefore loop-invariant.
     for _ in range(invalidation_failure_count):
         # Sanity check: every retry leaves the column state unchanged.
         assert state.previous_secret == secret_old
@@ -246,8 +250,8 @@ def test_p3_dual_window_holds_during_invalidation_failures(
     )
     assert _receiver_verifies(body_bytes, sig_made_with_old, state), (
         "Dual-window invariant violated: signature with OLD secret "
-        f"failed verification while previous_secret_hash is non-null "
-        f"after {invalidation_failure_count} retry failures"
+        f"failed verification while previous_secret_ciphertext is "
+        f"non-null after {invalidation_failure_count} retry failures"
     )
 
 
@@ -274,7 +278,8 @@ def test_p3_only_new_secret_verifies_after_invalidation_completes(
     1. Rotation set the columns to ``(current=new, previous=old)``.
     2. After ``invalidation_failure_count`` failed retries, the next
        attempt of :func:`_async_invalidate_previous_secret` succeeds.
-       The task commits ``UPDATE … SET previous_secret_hash = NULL``,
+       The task commits
+       ``UPDATE … SET previous_secret_ciphertext = NULL``,
        which closes the dual-window.
     3. From that point onward, the receiver simulator no longer
        caches the previous secret, so signatures produced with
@@ -305,21 +310,22 @@ def test_p3_only_new_secret_verifies_after_invalidation_completes(
         assert state.previous_secret == secret_old
 
     # Step 2: invalidation finally succeeds. The task's body issues
-    # ``UPDATE webhook_subscriptions SET previous_secret_hash = NULL
-    # WHERE id = :sub_id`` and commits.
+    # ``UPDATE webhook_subscriptions SET previous_secret_ciphertext
+    # = NULL WHERE id = :sub_id`` and commits.
     state.previous_secret = None
 
     # Step 3: dual-window has closed.
     # The signature made with the previous secret no longer verifies.
     assert not _receiver_verifies(body_bytes, sig_made_with_old, state), (
         "Post-invalidation invariant violated: signature with OLD "
-        "secret still verifies after previous_secret_hash was cleared"
+        "secret still verifies after previous_secret_ciphertext was "
+        "cleared"
     )
     # The signature made with the current secret continues to verify.
     assert _receiver_verifies(body_bytes, sig_made_with_new, state), (
         "Post-invalidation invariant violated: signature with NEW "
-        "secret failed verification after previous_secret_hash was "
-        "cleared"
+        "secret failed verification after previous_secret_ciphertext "
+        "was cleared"
     )
 
 
@@ -330,28 +336,28 @@ def test_p3_subscription_model_carries_previous_secret_column() -> None:
 
     The pure-function tests above reason about the dual-window in
     terms of a two-column projection of ``WebhookSubscription``. If
-    ``previous_secret_hash`` were ever removed from the model the
-    pure-function tests would still pass (they construct their own
-    state dataclass) but the production behaviour would silently
+    ``previous_secret_ciphertext`` were ever removed from the model
+    the pure-function tests would still pass (they construct their
+    own state dataclass) but the production behaviour would silently
     diverge. This guard pins the column-presence contract so a
     refactor that drops the column fails the test suite at this
     file rather than at integration time.
     """
     table = WebhookSubscription.__table__
-    assert "signing_secret_hash" in table.columns, (
-        "WebhookSubscription must expose signing_secret_hash to drive "
-        "outbound signing per Req 4.3"
+    assert "signing_secret_ciphertext" in table.columns, (
+        "WebhookSubscription must expose signing_secret_ciphertext to "
+        "drive outbound signing per Req 4.3"
     )
-    assert "previous_secret_hash" in table.columns, (
-        "WebhookSubscription must expose previous_secret_hash to "
-        "drive the dual-window per Req 3.5"
+    assert "previous_secret_ciphertext" in table.columns, (
+        "WebhookSubscription must expose previous_secret_ciphertext "
+        "to drive the dual-window per Req 3.5"
     )
 
-    prev_col = table.columns["previous_secret_hash"]
+    prev_col = table.columns["previous_secret_ciphertext"]
     assert prev_col.nullable, (
-        "previous_secret_hash must be nullable: the invalidation task "
-        "clears it to NULL once the previous secret is no longer "
-        "accepted (Req 3.5)"
+        "previous_secret_ciphertext must be nullable: the "
+        "invalidation task clears it to NULL once the previous "
+        "secret is no longer accepted (Req 3.5)"
     )
 
 
@@ -373,12 +379,12 @@ def test_p3_unrelated_secret_never_verifies(
     """A signature made with a third unrelated secret never verifies.
 
     Confirms the dual-window does not leak into a triple-acceptance
-    window: even with both ``signing_secret_hash`` and
-    ``previous_secret_hash`` populated, a signature produced with a
-    third secret that was never associated with the subscription
-    must fail verification. This guards against an off-by-one bug in
-    a hypothetical receiver implementation that tries every secret
-    in some larger cache.
+    window: even with both ``signing_secret_ciphertext`` and
+    ``previous_secret_ciphertext`` populated, a signature produced
+    with a third secret that was never associated with the
+    subscription must fail verification. This guards against an
+    off-by-one bug in a hypothetical receiver implementation that
+    tries every secret in some larger cache.
 
     The receiver simulator only ever consults the two columns of the
     subscription, so this property is a soundness check on

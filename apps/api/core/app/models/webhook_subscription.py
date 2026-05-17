@@ -24,15 +24,29 @@ class WebhookSubscription(Base):
 
     Signing-secret rotation contract:
         The plaintext signing secret is shown to the caller exactly once
-        at create or rotate time and never persisted. Only the SHA-256
-        hex digest of the current secret is stored in
-        ``signing_secret_hash``. During the rotation invalidation window
-        described in Req 3 AC5 the previous secret's hash is held in
-        ``previous_secret_hash`` so receivers that have not yet picked up
-        the new secret can still verify in-flight deliveries; the column
-        is cleared by the invalidation Celery task once the previous
-        secret is no longer accepted. Server-side outbound signing
-        always uses the latest secret, never the previous one.
+        at create or rotate time and is never persisted in plaintext.
+        The persistence column ``signing_secret_ciphertext`` holds the
+        Fernet ciphertext produced by
+        :func:`app.core.webhook_secret_crypto.encrypt_signing_secret`;
+        the delivery worker reverses the encryption with
+        :func:`app.core.webhook_secret_crypto.decrypt_signing_secret`
+        on every signing pass so it can compute
+        ``HMAC-SHA256(secret, body)`` per Req 4 AC3. SHA-256 is one-way,
+        which is why a hash-only column was insufficient; symmetric
+        encryption gives the worker a reversible store while keeping
+        plaintext bytes off disk so the substring scans pinned by
+        Property 1 (plaintext credential exposure exactly-once) cannot
+        find the secret on the persistence surface.
+
+        During the rotation invalidation window described in Req 3 AC5
+        the previous secret's ciphertext is held in
+        ``previous_secret_ciphertext`` so receivers that have not yet
+        picked up the new secret can still verify in-flight deliveries
+        on the receiver side. The column is cleared by the
+        :func:`app.tasks.webhook_tasks.invalidate_previous_secret`
+        task once the previous secret is no longer accepted.
+        Server-side outbound signing always uses the latest secret,
+        never the previous one.
 
     Activation and last-delivery cache:
         ``active`` is the on/off toggle exposed via ``PATCH``;
@@ -56,9 +70,13 @@ class WebhookSubscription(Base):
         event_types: JSON array of event-type strings drawn from the
             fixed enum.
         description: Optional human-readable label.
-        signing_secret_hash: SHA-256 hex of the current signing secret.
-        previous_secret_hash: SHA-256 hex of the previous signing secret;
-            non-null only during the rotation invalidation window.
+        signing_secret_ciphertext: Fernet ciphertext (base64 url-safe
+            ASCII) of the current signing secret. Stores ciphertext,
+            not plaintext and not a hash; the delivery worker decrypts
+            on demand to compute outbound HMAC signatures.
+        previous_secret_ciphertext: Fernet ciphertext of the previous
+            signing secret; non-null only during the rotation
+            invalidation window.
         active: On/off toggle for delivery dispatch; defaults to True.
         last_delivery_at: Cached timestamp of the most recent terminal
             delivery; updated by the worker.
@@ -94,9 +112,11 @@ class WebhookSubscription(Base):
     target_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     event_types: Mapped[List[str]] = mapped_column(JSONB, nullable=False, default=list)
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    signing_secret_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    previous_secret_hash: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True
+    signing_secret_ciphertext: Mapped[str] = mapped_column(
+        String(512), nullable=False
+    )
+    previous_secret_ciphertext: Mapped[Optional[str]] = mapped_column(
+        String(512), nullable=True
     )
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_delivery_at: Mapped[Optional[datetime]] = mapped_column(
