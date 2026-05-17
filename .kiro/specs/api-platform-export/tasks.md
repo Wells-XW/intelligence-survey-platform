@@ -308,7 +308,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Filter by any combination of `actor_user_id`, `resource_id` (api_key or subscription), time range, action verb; ordered by `created_at DESC`.
     - Used by the admin audit-logs endpoint.
     - _Requirements: 7.7_
-  - [-]* 14.3 Property test P20: Audit log query equivalence
+  - [x]* 14.3 Property test P20: Audit log query equivalence
     - **Property 20: Audit log query equivalence**
     - Strategy generates random audit row sets and random filter combinations; assert endpoint output equals in-memory filter modulo pagination and ordering.
     - `@settings(max_examples=100)`.
