@@ -1,6 +1,6 @@
 """Application configuration loaded from environment variables."""
 
-from typing import Tuple
+from typing import Dict, List, Tuple
 
 from pydantic_settings import BaseSettings
 

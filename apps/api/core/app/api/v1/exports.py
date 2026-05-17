@@ -523,7 +523,12 @@ async def get_export_job(
                 "media type."
             ),
             "content": {
-                "text/csv; charset=utf-8": {},
+                "text/csv; charset=utf-8": {
+                    "example": (
+                        "response_id,respondent_id,submitted_at,q1\n"
+                        "r-001,rcp-01,2026-04-12T08:30:00Z,5\n"
+                    )
+                },
                 (
                     "application/vnd.openxmlformats-officedocument."
                     "spreadsheetml.sheet"

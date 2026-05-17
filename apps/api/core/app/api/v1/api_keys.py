@@ -276,6 +276,13 @@ def _build_out_payload(row: ApiKey, now: datetime, threshold: timedelta) -> dict
     "/",
     response_model=ApiKeyCreateOut,
     status_code=status.HTTP_201_CREATED,
+    summary="Create an API key",
+    description=(
+        "Issue a new long-lived API key bound to the authenticated "
+        "user. The plaintext secret is returned in the response body "
+        "exactly once — capture it now, it cannot be recovered later. "
+        "Only ``key_prefix`` and ``key_hash`` are persisted."
+    ),
 )
 async def create_api_key(
     body: ApiKeyCreateIn,
@@ -344,7 +351,16 @@ async def create_api_key(
     return ApiKeyCreateOut(**payload)
 
 
-@router.get("/", response_model=List[ApiKeyOut])
+@router.get(
+    "/",
+    response_model=List[ApiKeyOut],
+    summary="List the caller's API keys",
+    description=(
+        "Return every API key owned by the authenticated user — "
+        "active, revoked, and expired — in newest-first order. "
+        "Plaintext and hash fields are never included."
+    ),
+)
 async def list_api_keys(
     principal: Principal = Depends(_require_jwt_principal),
     db: AsyncSession = Depends(get_db),
@@ -377,7 +393,17 @@ async def list_api_keys(
     return [ApiKeyOut(**_build_out_payload(row, now, threshold)) for row in rows]
 
 
-@router.post("/{key_id}/rotate", response_model=ApiKeyRotateOut)
+@router.post(
+    "/{key_id}/rotate",
+    response_model=ApiKeyRotateOut,
+    summary="Rotate an API key's secret",
+    description=(
+        "Generate a fresh plaintext secret for an existing key, "
+        "replacing ``key_prefix`` and ``key_hash`` in place. The new "
+        "plaintext is returned exactly once. The previous secret is "
+        "invalidated immediately upon rotation."
+    ),
+)
 async def rotate_api_key(
     key_id: str,
     request: Request,
@@ -448,7 +474,16 @@ async def rotate_api_key(
     return ApiKeyRotateOut(**payload)
 
 
-@router.post("/{key_id}/revoke", response_model=ApiKeyOut)
+@router.post(
+    "/{key_id}/revoke",
+    response_model=ApiKeyOut,
+    summary="Revoke an API key",
+    description=(
+        "Mark the key as permanently inert by stamping ``revoked_at``. "
+        "The operation is idempotent: revoking an already-revoked key "
+        "returns the row unchanged and emits no duplicate audit row."
+    ),
+)
 async def revoke_api_key(
     key_id: str,
     request: Request,
@@ -509,7 +544,17 @@ async def revoke_api_key(
     return ApiKeyOut(**_build_out_payload(row, now, threshold))
 
 
-@router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{key_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Hard-delete a previously revoked API key",
+    description=(
+        "Permanently remove a revoked key once the audit retention "
+        "window has elapsed. Blocked attempts return 409 with a "
+        "stable ``reason`` of either ``not_revoked`` or "
+        "``retention_pending``."
+    ),
+)
 async def hard_delete_api_key(
     key_id: str,
     principal: Principal = Depends(_require_jwt_principal),

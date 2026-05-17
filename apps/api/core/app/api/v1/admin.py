@@ -303,7 +303,17 @@ async def _compute_30d_failure_counts(
 # ── Routes ────────────────────────────────────────────────────────────
 
 
-@router.get("/api-keys", response_model=List[AdminApiKeyOut])
+@router.get(
+    "/api-keys",
+    response_model=List[AdminApiKeyOut],
+    summary="List every non-revoked API key across all tenants",
+    description=(
+        "Return the cross-tenant inventory of active API keys with "
+        "each key's owner identity and a trailing 30-day request "
+        "count. Restricted to ``admin:read`` scope plus the platform "
+        "``is_admin`` flag."
+    ),
+)
 async def list_all_api_keys(
     principal: Principal = Depends(require_scope("admin:read")),
     db: AsyncSession = Depends(get_db),
@@ -348,7 +358,18 @@ async def list_all_api_keys(
     ]
 
 
-@router.post("/api-keys/{key_id}/revoke", response_model=AdminApiKeyOut)
+@router.post(
+    "/api-keys/{key_id}/revoke",
+    response_model=AdminApiKeyOut,
+    summary="Force-revoke an API key on behalf of compliance",
+    description=(
+        "Set ``revoked_at`` on a key without requiring the owner's "
+        "consent. Emits the distinct ``api_key.admin_revoke`` audit "
+        "verb so reviewers can separate self-revoke from "
+        "compliance-driven revoke. Restricted to ``admin:write`` "
+        "scope plus the platform ``is_admin`` flag."
+    ),
+)
 async def admin_revoke_api_key(
     key_id: str,
     request: Request,
@@ -422,7 +443,17 @@ async def admin_revoke_api_key(
     return _build_admin_api_key_payload(row, request_count_30d=None)
 
 
-@router.get("/webhooks", response_model=List[AdminWebhookSubscriptionOut])
+@router.get(
+    "/webhooks",
+    response_model=List[AdminWebhookSubscriptionOut],
+    summary="List every active webhook subscription across all tenants",
+    description=(
+        "Return the cross-tenant inventory of active webhook "
+        "subscriptions with each subscription's owner identity and a "
+        "trailing 30-day permanent-failure count. Restricted to "
+        "``admin:read`` scope plus the platform ``is_admin`` flag."
+    ),
+)
 async def list_all_webhooks(
     principal: Principal = Depends(require_scope("admin:read")),
     db: AsyncSession = Depends(get_db),
@@ -479,7 +510,18 @@ async def list_all_webhooks(
     ]
 
 
-@router.get("/exports", response_model=List[AdminExportJobOut])
+@router.get(
+    "/exports",
+    response_model=List[AdminExportJobOut],
+    summary="List export jobs across all tenants",
+    description=(
+        "Return the cross-tenant inventory of export jobs filtered "
+        "by an optional time range. Each row carries the owner "
+        "identity, the survey, the format, the lifecycle status, and "
+        "the materialized byte size when present. Restricted to "
+        "``admin:read`` scope plus the platform ``is_admin`` flag."
+    ),
+)
 async def list_all_exports(
     since: Optional[datetime] = Query(
         default=None,
@@ -563,7 +605,18 @@ async def list_all_exports(
     ]
 
 
-@router.get("/audit-logs", response_model=List[AdminAuditLogOut])
+@router.get(
+    "/audit-logs",
+    response_model=List[AdminAuditLogOut],
+    summary="Query the audit log with optional filters",
+    description=(
+        "Return audit rows newest-first, filtered by any combination "
+        "of acting user, resource, action verb, and time range. "
+        "Restricted to the ``audit:read`` scope plus the platform "
+        "``is_admin`` flag — audit review is a stricter privilege "
+        "than the general admin inventory reads."
+    ),
+)
 async def list_audit_logs(
     actor_user_id: Optional[str] = Query(
         default=None,

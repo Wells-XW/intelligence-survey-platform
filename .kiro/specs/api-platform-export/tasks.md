@@ -31,7 +31,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Define a frozen set of the new action verbs (`api_key.create`, `api_key.rotate`, `api_key.revoke`, `api_key.admin_revoke`, `webhook.subscription.create`, `.update`, `.rotate_secret`, `.delete`, `webhook.delivery.succeeded`, `webhook.delivery.failed`, `export.job.created`, `.succeeded`, `.failed`, `.expired`, `rate_limit.rejected`, `rate_limiter.backend_unavailable`).
     - Do not modify the existing `audit_logs` schema; map all extras into `details` JSONB.
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.8_
-  - [ ]* 1.4 Unit test the audit row schema mapper
+  - [x]* 1.4 Unit test the audit row schema mapper
     - Verify reserved-column keys are dropped silently and the schema-compatible subset survives in `details`.
     - _Requirements: 7.9_
 
@@ -45,7 +45,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Add `is_admin` column to existing `User` model and the `api_keys` back-populates relationship.
     - Use Google-style class docstring describing the lifecycle states.
     - _Requirements: 2.1, 2.5_
-  - [ ]* 2.3 Smoke test for migration chain integrity
+  - [x]* 2.3 Smoke test for migration chain integrity
     - Run alembic upgrade head against an empty test database in a fixture, assert the chain is contiguous from `0007` through `0008`.
     - _Requirements: 2.1_
 
@@ -91,22 +91,22 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Strategy creates and rotates random keys, scans every other API response body and every column read of `api_keys` and every `audit_logs.details`; asserts the plaintext appears nowhere outside the original create and rotate response bodies.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 2.1, 2.3, 2.8**
-  - [ ]* 4.4 Property test P2: Rotation invalidates the previous secret (API key portion)
+  - [x]* 4.4 Property test P2: Rotation invalidates the previous secret (API key portion)
     - **Property 2: Rotation invalidates the previous secret**
     - Strategy generates rotation sequences; assert post-rotation requests with the previous plaintext yield 401 and with the new plaintext authenticate.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 2.4**
-  - [ ]* 4.5 Property test P4 (key portion): revoke ceases activity
+  - [x]* 4.5 Property test P4 (key portion): revoke ceases activity
     - **Property 4: Revoke and delete cease subsequent activity (API key clause)**
     - Strategy revokes random subsets of created keys; assert all subsequent requests yield 401.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 2.5**
-  - [ ]* 4.6 Property test P6: Inactive flag predicate
+  - [x]* 4.6 Property test P6: Inactive flag predicate
     - **Property 6: Inactive flag predicate**
     - Strategy generates `(last_used_at, created_at, threshold)` triples (some `last_used_at == None`); assert the list endpoint's `inactive` flag equals `(now - coalesce(last_used_at, created_at)) >= threshold`.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 2.9**
-  - [ ]* 4.7 Property test P19 (api_key portion): audit emission for terminal transitions
+  - [x]* 4.7 Property test P19 (api_key portion): audit emission for terminal transitions
     - **Property 19: Audit emission for terminal transitions (api_key verbs)**
     - Strategy creates / rotates / revokes / admin-revokes random keys; assert exactly one audit row per transition with the matching verb, actor, resource_type=`api_key`, resource_id=key id.
     - `@settings(max_examples=100)`.
@@ -143,7 +143,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Insert one `WebhookDelivery` per match in status `pending` inside the caller's DB transaction; enqueue Celery `deliver_webhook(delivery_id)` after commit.
     - Wire emitter into the existing handlers per design §Component 3: `app/api/v1/responses.py` (response.created, response.completed), `app/services/sample_service.py` (quota.reached), `app/api/v1/distribution.py` (distribution.sent).
     - _Requirements: 4.1_
-  - [ ]* 7.4 Property test P1 (webhook portion): plaintext exposure exactly-once for signing secret
+  - [-]* 7.4 Property test P1 (webhook portion): plaintext exposure exactly-once for signing secret
     - **Property 1: Plaintext credential exposure is exactly-once (webhook clause)**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 3.1, 3.4**
@@ -152,11 +152,11 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Hypothesis strategy generates random payload dicts, secrets, event types, delivery IDs; assert the request constructed by the signer plus header builder carries all five required headers and the signature equals the stdlib reference.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 4.2, 4.3**
-  - [ ]* 7.6 Property test P11: Manual redelivery preserves payload bytes
+  - [x]* 7.6 Property test P11: Manual redelivery preserves payload bytes
     - **Property 11: Manual redelivery preserves payload bytes**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 4.10**
-  - [ ]* 7.7 Property test P19 (webhook subscription portion)
+  - [x]* 7.7 Property test P19 (webhook subscription portion)
     - **Property 19: Audit emission for terminal transitions (webhook subscription verbs)**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 7.2**
@@ -173,7 +173,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
   - [x] 8.2 Add a previous-secret invalidation Celery task
     - At-least-once retry; clears `previous_secret_hash` once invalidation completes.
     - _Requirements: 3.5_
-  - [ ]* 8.3 Property test P3: Webhook signature dual-window during invalidation failure
+  - [x]* 8.3 Property test P3: Webhook signature dual-window during invalidation failure
     - **Property 3: Webhook signature dual-window during invalidation failure**
     - Strategy simulates rotation followed by invalidation failures of varying counts; assert receiver-simulator verifies both secrets while `previous_secret_hash` is non-null and only the new one once it is null.
     - `@settings(max_examples=100)`.
@@ -243,7 +243,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Hypothesis strategy generates random format strings; assert membership in the runtime supported set is exactly equivalent to the create endpoint's accept / reject decision (with `export_format_unsupported` on reject).
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 5.1, 5.2, 5.3**
-  - [ ]* 11.7 Property test P13: Export job lifecycle convergence
+  - [x]* 11.7 Property test P13: Export job lifecycle convergence
     - **Property 13: Export job lifecycle convergence**
     - Strategy generates random sequences of worker outcomes plus retention sweeps; assert monotone status lattice, `started_at <= completed_at`, file existence matches `status`, no partial files survive `failed`.
     - `@settings(max_examples=100)`.
@@ -285,7 +285,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Strategy generates `(Lm, Lh, Ld)` quotas and post-increment `(Cm, Ch, Cd)` counts; assert allow / deny equals `Cm > Lm OR Ch > Lh OR Cd > Ld`, that the headers on allow match the spec, and that `Retry-After` on deny equals `min(reset(w) - now)` over the exceeded windows.
     - Use `fakeredis` for speed. `@settings(max_examples=100)`.
     - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
-  - [ ]* 13.3 Property test P17: Effective quota composition
+  - [x]* 13.3 Property test P17: Effective quota composition
     - **Property 17: Effective quota composition**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 6.5, 6.6**
@@ -348,12 +348,12 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Create `apps/api/core/app/static/integration-guide.md` with four worked examples (auth, list surveys, register a webhook, start an export) in cURL plus one of {Python (`httpx`), JavaScript (`fetch`)}.
     - Link from the FastAPI `description=` so it is reachable from the Swagger UI page.
     - _Requirements: 1.6_
-  - [ ]* 16.4 Property test P24: Universal documentation annotation
+  - [x]* 16.4 Property test P24: Universal documentation annotation
     - **Property 24: Universal documentation annotation**
     - Iterate over all routes with `include_in_schema == True`; assert non-empty `summary`, non-empty `description`, at least one example response, and at least one example request body where applicable.
     - `@settings(max_examples=100)` (the strategy is over the route set; one Hypothesis assertion per route is sufficient).
     - **Validates: Requirements 1.4**
-  - [ ]* 16.5 Property test P25: Universal internal-route exclusion
+  - [x]* 16.5 Property test P25: Universal internal-route exclusion
     - **Property 25: Universal internal-route exclusion**
     - For every route with `include_in_schema == False`, assert the path is absent from the generated OpenAPI document.
     - `@settings(max_examples=100)`.

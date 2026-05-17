@@ -560,6 +560,24 @@ async def search_entries(
         "plus metadata. Used by the in-app help drawer to deep-link "
         "to topic-specific guidance."
     ),
+    responses={
+        200: {
+            "description": "Knowledge-base entry payload.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "kb-likert-design",
+                        "title": "Likert scale design",
+                        "category": "psychometrics",
+                        "language": "en",
+                        "content_markdown": "## Likert scales\n...",
+                        "tags": ["scales", "design"],
+                        "created_at": "2026-04-12T08:00:00Z",
+                    }
+                }
+            },
+        }
+    },
 )
 async def get_entry(
     entry_id: str,

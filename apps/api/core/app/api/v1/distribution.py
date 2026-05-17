@@ -1082,6 +1082,25 @@ public_router = APIRouter(prefix="/surveys", tags=["distribution-public"])
         "Tokens are 32-character ``uuid.hex`` values minted at "
         "send time."
     ),
+    responses={
+        200: {
+            "description": "Resolved survey and recipient context.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "survey_id": "d3b07384-d9a8-4f3b-9f1e-6c2a4d2c8a11",
+                        "survey_title": "Workplace wellbeing 2026",
+                        "recipient_id": "rcp_01HXYZ",
+                        "recipient_name": "Li Xiao",
+                        "token": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+                        "redirect_url": (
+                            "/survey/d3b07384-d9a8-4f3b-9f1e-6c2a4d2c8a11/fill"
+                        ),
+                    }
+                }
+            },
+        }
+    },
 )
 async def resolve_fill_token(
     token: str,

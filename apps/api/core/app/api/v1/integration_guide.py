@@ -30,7 +30,18 @@ _GUIDE_PATH = (
     ),
     responses={
         200: {
-            "content": {"text/markdown": {}},
+            "content": {
+                "text/markdown": {
+                    "example": (
+                        "# Integration Guide\n\n"
+                        "## Authenticate\n"
+                        "```\n"
+                        "curl -X POST https://api.example.com/api/v1/auth/login \\\n"
+                        "  -d 'username=you@example.com&password=...'\n"
+                        "```\n"
+                    )
+                }
+            },
             "description": "Integration guide markdown.",
         },
         404: {"description": "Guide file is missing on this deployment."},

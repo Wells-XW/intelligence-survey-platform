@@ -282,6 +282,21 @@ async def delete_all_responses(
         "asynchronous multi-format exports use the "
         "``/api/v1/exports`` endpoint family instead."
     ),
+    responses={
+        200: {
+            "description": (
+                "CSV download of every response for the survey."
+            ),
+            "content": {
+                "text/csv": {
+                    "example": (
+                        "response_id,respondent_id,submitted_at,is_complete,q1,q2\n"
+                        "r-001,rcp-01,2026-04-12T08:30:00Z,True,5,Agree\n"
+                    )
+                }
+            },
+        }
+    },
 )
 async def export_responses(
     survey_id: UUID,

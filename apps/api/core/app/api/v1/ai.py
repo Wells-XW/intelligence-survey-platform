@@ -104,6 +104,26 @@ async def generate_survey_nonstream(
         "``done`` event carries the rendered survey JSON and SQP "
         "quality report."
     ),
+    responses={
+        200: {
+            "description": (
+                "Server-Sent Events stream of progress and a final "
+                "``done`` event."
+            ),
+            "content": {
+                "text/event-stream": {
+                    "example": (
+                        "event: progress\n"
+                        'data: {"stage": "generating", "message": "Drafting questions", '
+                        '"progress_pct": 45}\n\n'
+                        "event: done\n"
+                        'data: {"stage": "done", "progress_pct": 100, '
+                        '"data": {"survey": {}, "report": {}}}\n\n'
+                    )
+                }
+            },
+        }
+    },
 )
 async def generate_survey_stream(
     gen_request: SurveyGenerationRequest,
@@ -235,6 +255,25 @@ async def evaluate_survey(
         "API key is set). Status is ``ok`` when at least one "
         "provider is fully configured, ``no_api_key`` otherwise."
     ),
+    responses={
+        200: {
+            "description": "AI service status payload.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "ok",
+                        "providers": {
+                            "deepseek": {
+                                "available": True,
+                                "model": "deepseek-chat",
+                                "base_url": "https://api.deepseek.com",
+                            }
+                        },
+                    }
+                }
+            },
+        }
+    },
 )
 async def ai_health():
     """Check AI service availability."""
