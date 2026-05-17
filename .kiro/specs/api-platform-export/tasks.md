@@ -369,20 +369,20 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 9.5**
 
-- [ ] 18. Integration tests against local Docker Postgres + Redis
-  - [ ]* 18.1 Migration chain integration test
+- [x] 18. Integration tests against local Docker Postgres + Redis
+  - [x]* 18.1 Migration chain integration test
     - Boot a clean test database, run `alembic upgrade head`, assert the chain `0007 → 0008 → 0009 → 0010 → 0011` applies cleanly and downgrades cleanly.
     - _Requirements: 2.1, 3.1, 5.1, 7.7_
-  - [ ]* 18.2 Documentation route integration test
+  - [x]* 18.2 Documentation route integration test
     - Boot the FastAPI test client; assert `GET /api/v1/openapi.json` returns valid OpenAPI 3.x JSON, `GET /api/v1/docs` returns Swagger HTML, `GET /api/v1/redoc` returns ReDoc HTML, and the integration guide is reachable from the Swagger page.
     - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6_
-  - [ ]* 18.3 Dual-auth wiring integration test
+  - [x]* 18.3 Dual-auth wiring integration test
     - Hit one survey-scoped GET with JWT only, with API key only, with both, and with neither; assert the resolved principal and HTTP status match the design table.
     - _Requirements: 8.1, 8.2, 8.3_
   - [ ]* 18.4 Celery worker boot integration test
     - Boot the `webhooks` and `exports` workers; enqueue one trivial task per queue; assert each is consumed and acknowledged.
     - _Requirements: 4.1, 5.4_
-  - [ ]* 18.5 Audit schema conformance integration test
+  - [x]* 18.5 Audit schema conformance integration test
     - Append one audit row per new verb against the live `audit_logs` table; assert no migration error and that all 16 verbs round-trip cleanly.
     - _Requirements: 7.8_
   - [ ]* 18.6 `pyreadstat` import smoke test

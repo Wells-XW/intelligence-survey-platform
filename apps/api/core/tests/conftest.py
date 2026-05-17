@@ -1,5 +1,15 @@
 """Shared test fixtures for the Intelligence Survey Platform API."""
 
+# Force the test database URL to point at the live test Postgres on
+# port 5433 BEFORE app.config is imported. The default settings value
+# targets port 5432, which is not running in this environment.
+import os
+
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql+asyncpg://survey:survey@localhost:5433/survey_test_db",
+)
+
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -12,16 +22,22 @@ from app.main import app
 TEST_DATABASE_URL = settings.database_url.replace("survey_db", "survey_test_db")
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def test_engine():
-    """Create test database tables once per session."""
+    """Create a fresh test database engine per test.
+
+    Per-test scope is required because asyncpg connections are bound to
+    the event loop on which they were created. pytest-asyncio 1.x runs
+    each test on its own loop by default, so a session-scoped engine
+    leaks asyncpg connections across loops and trips
+    ``RuntimeError: ... attached to a different loop`` or
+    ``InterfaceError: another operation is in progress``.
+    """
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield engine
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
 
@@ -35,6 +51,51 @@ async def db_session(test_engine):
         async with session.begin() as transaction:
             yield session
             await transaction.rollback()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_app_loop_caches():
+    """Reset module-level async clients pinned to the previous loop.
+
+    The FastAPI ``app`` is constructed once at import time, so any
+    middleware that lazily caches an asyncio resource (Redis client,
+    DB engine) ends up bound to whichever event loop happened to make
+    the first call. pytest-asyncio creates a fresh loop for each test
+    by default, which makes those cached clients unusable on the
+    next test and surfaces as
+    ``RuntimeError: ... attached to a different loop`` (which then
+    causes the rate-limit middleware to fail closed with 503 and mask
+    the 401 the test is asserting on).
+
+    Clearing the well-known caches before each test gives every test
+    a clean slate without changing how production code behaves.
+    """
+    from app.middleware.rate_limit import RateLimitMiddleware
+
+    # Walk the live middleware stack (built lazily on first request,
+    # then cached on the app) and null out the rate-limit instance's
+    # cached aioredis client.
+    stack = getattr(app, "middleware_stack", None)
+    node = stack
+    seen = 0
+    while node is not None and seen < 16:
+        if isinstance(node, RateLimitMiddleware):
+            node._redis = None
+        node = getattr(node, "app", None)
+        seen += 1
+
+    # The app's main DB engine (used by the rate-limit middleware's
+    # audit emission via ``app.database.async_session``) is also
+    # loop-bound. Disposing it forces a fresh asyncpg pool on the
+    # current loop.
+    from app import database as app_db
+
+    try:
+        await app_db.engine.dispose()
+    except Exception:
+        pass
+
+    yield
 
 
 @pytest_asyncio.fixture
