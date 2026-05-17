@@ -49,7 +49,11 @@ celery_app = Celery(
     "intelligence_survey_platform",
     broker=settings.redis_url or "redis://localhost:6379/0",
     backend=settings.redis_url or "redis://localhost:6379/0",
-    include=["app.tasks.ai_tasks"],
+    include=[
+        "app.tasks.ai_tasks",
+        "app.tasks.webhook_tasks",
+        "app.tasks.export_tasks",
+    ],
 )
 
 # Declare the queue topology. Routing keys mirror queue names by convention so
@@ -60,6 +64,23 @@ celery_app.conf.task_queues = (
     Queue("webhooks", routing_key="webhooks"),
     Queue("exports", routing_key="exports"),
 )
+
+# Declarative task→queue routing. Call sites still pass ``queue=`` explicitly
+# for clarity, but ``task_routes`` is the source of truth so a worker booted
+# with ``celery -A app.tasks worker --queues=webhooks,exports`` knows which
+# tasks belong on which queue without inspecting every dispatch site. Each
+# entry maps a fully qualified task name to a routing dict.
+celery_app.conf.task_routes = {
+    "app.tasks.webhook_tasks.deliver_webhook": {"queue": "webhooks"},
+    "app.tasks.webhook_tasks.reconcile_pending_deliveries": {
+        "queue": "webhooks"
+    },
+    "app.tasks.webhook_tasks.invalidate_previous_secret": {
+        "queue": "webhooks"
+    },
+    "app.tasks.export_tasks.materialize_export": {"queue": "exports"},
+    "app.tasks.export_tasks.sweep_expired_exports": {"queue": "exports"},
+}
 
 celery_app.conf.update(
     task_default_queue="celery",

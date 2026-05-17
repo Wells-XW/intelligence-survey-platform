@@ -10,7 +10,7 @@ T15 ("API Open Platform and Export Enhancement"):
     - Creates the ``export_jobs`` table per design.md
       §"Data Models 0010". Each row represents a single materialization
       request from a user against one survey in one supported format
-      (``csv`` / ``xlsx`` / ``json`` / ``sav`` / ``sas7bdat``) and
+      (``csv`` / ``xlsx`` / ``json`` / ``sav`` / ``xpt``) and
       tracks that request through the queued / running / succeeded /
       failed / expired state machine described in design.md
       §"Export job state machine".

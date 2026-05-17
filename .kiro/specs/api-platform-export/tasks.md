@@ -67,7 +67,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Hypothesis strategy generates `ApiKey` rows with `expires_at` drawn from the past and from the future; assert past keys yield 401 + `api_key_expired` and future keys authenticate.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 2.6**
-  - [ ]* 3.4 Property test P7: Authentication and authorization composition
+  - [x]* 3.4 Property test P7: Authentication and authorization composition
     - **Property 7: Authentication and authorization composition**
     - Strategy generates `(jwt_validity, api_key_validity, scopes, rbac_role, required_role, required_scope)` tuples; reference predicate is implemented in the test as the spec from design §Property 7; assert `get_principal` plus `require_scope` plus `check_survey_permission` agrees with the predicate on every example.
     - `@settings(max_examples=100)`.
@@ -86,7 +86,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - `ApiKeyCreateIn`, `ApiKeyCreateOut` (with `plaintext` field), `ApiKeyOut` (no plaintext, no hash), `ApiKeyRotateOut`.
     - Add OpenAPI examples on every schema (request and response) per Property 24.
     - _Requirements: 1.4, 2.3, 2.8_
-  - [ ]* 4.3 Property test P1: Plaintext exposure exactly-once (API key portion)
+  - [x]* 4.3 Property test P1: Plaintext exposure exactly-once (API key portion)
     - **Property 1: Plaintext credential exposure is exactly-once**
     - Strategy creates and rotates random keys, scans every other API response body and every column read of `api_keys` and every `audit_logs.details`; asserts the plaintext appears nowhere outside the original create and rotate response bodies.
     - `@settings(max_examples=100)`.
@@ -178,23 +178,23 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Strategy simulates rotation followed by invalidation failures of varying counts; assert receiver-simulator verifies both secrets while `previous_secret_hash` is non-null and only the new one once it is null.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 3.5**
-  - [ ]* 8.4 Property test P4 (webhook portion): delete ceases dispatch
+  - [x]* 8.4 Property test P4 (webhook portion): delete ceases dispatch
     - **Property 4: Revoke and delete cease subsequent activity (webhook clause)**
     - Strategy deletes random subsets of subscriptions, then emits matching events; assert zero new `WebhookDelivery` rows for deleted subs.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 3.6**
-  - [ ]* 8.5 Property test P8: Webhook routing fan-out
+  - [x]* 8.5 Property test P8: Webhook routing fan-out
     - **Property 8: Webhook routing fan-out**
     - Strategy generates random subscription sets and an emitted event; assert the count of newly created delivery rows equals the count of subscriptions matching `(active, event_types contains e, owner has viewer)`.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 4.1**
-  - [ ]* 8.6 Property test P10: Webhook delivery state machine
+  - [x]* 8.6 Property test P10: Webhook delivery state machine
     - **Property 10: Webhook delivery state machine**
     - Strategy generates random sequences over `{success_2xx, network_error, timeout, http_4xx, http_5xx, enqueue_failure}`; mock `httpx.post` and the Celery enqueue path; assert final status, `attempt_count`, `next_attempt_at`, and audit emission match the reference state machine on each sequence.
     - Use `CELERY_TASK_ALWAYS_EAGER=True` and `fakeredis` to keep iterations cheap.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 4.4, 4.5, 4.6, 4.7, 4.8**
-  - [ ]* 8.7 Property test P19 (webhook delivery portion)
+  - [x]* 8.7 Property test P19 (webhook delivery portion)
     - **Property 19: Audit emission for terminal transitions (webhook delivery verbs)**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 7.3**
@@ -253,7 +253,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Strategy generates small random surveys (SurveyJS-shaped schemas) and response lists keyed against them; assert the CSV BOM and header order, XLSX single sheet and dimensions, JSON list-of-objects with subset keys.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 5.5, 5.6, 5.7**
-  - [ ]* 11.9 Property test P14: Export format structural invariants (SAV / SAS7BDAT)
+  - [x]* 11.9 Property test P14: Export format structural invariants (SAV / SAS7BDAT)
     - **Property 14: Export format structural invariants (binary formats)**
     - Strategy as in P14 textual; round-trip via `pyreadstat`; assert variable label and value label maps. `pyreadstat` write-and-read is slow, so use `@settings(max_examples=20)` per design §Testing Strategy.
     - Skip when `pyreadstat` is not importable.
@@ -263,7 +263,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Strategy generates random `(job_status, caller, token validity)` tuples; assert the response code matches the design predicate (200 only when status=succeeded AND one of the three accepted auth paths holds).
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 5.10, 5.11**
-  - [ ]* 11.11 Property test P19 (export portion)
+  - [x]* 11.11 Property test P19 (export portion)
     - **Property 19: Audit emission for terminal transitions (export verbs)**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 7.4**
@@ -289,12 +289,12 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - **Property 17: Effective quota composition**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 6.5, 6.6**
-  - [ ]* 13.4 Property test P18: Rate-limit fail-closed on Redis outage
+  - [x]* 13.4 Property test P18: Rate-limit fail-closed on Redis outage
     - **Property 18: Rate-limit fail-closed on Redis outage**
     - Strategy simulates `redis.ConnectionError` / timeout at random points during the limiter call; assert HTTP 503 with the spec body, the route handler is not invoked, and exactly one `rate_limiter.backend_unavailable` audit row is appended.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 6.7**
-  - [ ]* 13.5 Property test P19 (rate-limit portion)
+  - [x]* 13.5 Property test P19 (rate-limit portion)
     - **Property 19: Audit emission for terminal transitions (rate-limit verbs)**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 7.5**
@@ -308,12 +308,12 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Filter by any combination of `actor_user_id`, `resource_id` (api_key or subscription), time range, action verb; ordered by `created_at DESC`.
     - Used by the admin audit-logs endpoint.
     - _Requirements: 7.7_
-  - [ ]* 14.3 Property test P20: Audit log query equivalence
+  - [-]* 14.3 Property test P20: Audit log query equivalence
     - **Property 20: Audit log query equivalence**
     - Strategy generates random audit row sets and random filter combinations; assert endpoint output equals in-memory filter modulo pagination and ordering.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 7.7**
-  - [ ]* 14.4 Property test P21: Audit row schema conformance
+  - [x]* 14.4 Property test P21: Audit row schema conformance
     - **Property 21: Audit row schema conformance**
     - Strategy generates arbitrary `details` dicts including reserved-column collisions; assert persisted row has only allowed columns and that conflicting keys are dropped silently.
     - `@settings(max_examples=100)`.
@@ -328,7 +328,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - The webhooks inventory carries a 30-day failure count derived from `webhook_deliveries`.
     - Pydantic schemas at `apps/api/core/app/schemas/admin.py` with OpenAPI examples on every shape.
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
-  - [ ]* 15.2 Property test P22: Admin inventory completeness
+  - [x]* 15.2 Property test P22: Admin inventory completeness
     - **Property 22: Admin inventory completeness**
     - Strategy generates random states of the three tables; assert each endpoint returns exactly the spec-filtered rows including the empty-list case.
     - `@settings(max_examples=100)`.
@@ -363,7 +363,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
   - [x] 17.1 Wire the new audit verbs into the existing T10 compliance export query
     - Confirm the existing T10 compliance export at the existing module location selects rows by time range only (no verb whitelist); add a smoke check if any whitelist exists, and update it to include the new verbs.
     - _Requirements: 9.5_
-  - [ ]* 17.2 Property test P23: Compliance export inclusion
+  - [x]* 17.2 Property test P23: Compliance export inclusion
     - **Property 23: Compliance export inclusion**
     - Strategy generates random `(time range, audit row sets)` pairs whose verbs span the new set; assert all in-range rows appear in the compliance export output.
     - `@settings(max_examples=100)`.
@@ -379,13 +379,13 @@ Property tasks reference design properties P1 through P25 and the requirements c
   - [x]* 18.3 Dual-auth wiring integration test
     - Hit one survey-scoped GET with JWT only, with API key only, with both, and with neither; assert the resolved principal and HTTP status match the design table.
     - _Requirements: 8.1, 8.2, 8.3_
-  - [ ]* 18.4 Celery worker boot integration test
+  - [x]* 18.4 Celery worker boot integration test
     - Boot the `webhooks` and `exports` workers; enqueue one trivial task per queue; assert each is consumed and acknowledged.
     - _Requirements: 4.1, 5.4_
   - [x]* 18.5 Audit schema conformance integration test
     - Append one audit row per new verb against the live `audit_logs` table; assert no migration error and that all 16 verbs round-trip cleanly.
     - _Requirements: 7.8_
-  - [ ]* 18.6 `pyreadstat` import smoke test
+  - [x]* 18.6 `pyreadstat` import smoke test
     - In the export worker's environment, assert `pyreadstat` imports cleanly and `SUPPORTED_FORMATS` includes `sav` and `sas7bdat`.
     - _Requirements: 5.2_
 

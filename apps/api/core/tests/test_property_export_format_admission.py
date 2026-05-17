@@ -29,7 +29,9 @@ from app.services.export_formats import (  # type: ignore[attr-defined]
 _BASELINE_FORMATS = frozenset({"csv", "xlsx", "json"})
 
 # Conditional formats per Req 5.2 — only present when pyreadstat imports.
-_PYREADSTAT_FORMATS = frozenset({"sav", "sas7bdat"})
+# The SAS path is XPORT (.xpt) rather than .sas7bdat because pyreadstat
+# ships only a SAS7BDAT reader; XPORT is the supported write format.
+_PYREADSTAT_FORMATS = frozenset({"sav", "xpt"})
 
 
 def _expected_membership(f: str) -> bool:
@@ -39,7 +41,7 @@ def _expected_membership(f: str) -> bool:
     and only if:
       * ``f`` is one of the baseline formats {csv, xlsx, json}, OR
       * ``pyreadstat`` is importable in this worker's environment and
-        ``f`` is one of {sav, sas7bdat}.
+        ``f`` is one of {sav, xpt}.
 
     Any other input — empty strings, garbage, partial prefixes,
     capitalisation variants — must be rejected with HTTP 400 +
@@ -89,7 +91,7 @@ def test_p12_arbitrary_format_string_admission_predicate(f: str) -> None:
 
 # Feature: api-platform-export, Property 12: Export format admission
 def test_p12_pyreadstat_extends_supported_formats_consistently() -> None:
-    """Conditional sav/sas7bdat support tracks the pyreadstat probe.
+    """Conditional sav/xpt support tracks the pyreadstat probe.
 
     The module-private ``_PYREADSTAT_AVAILABLE`` flag is the single
     source of truth for whether the SPSS / SAS producers loaded; this
@@ -100,7 +102,7 @@ def test_p12_pyreadstat_extends_supported_formats_consistently() -> None:
     """
     if _PYREADSTAT_AVAILABLE:
         assert "sav" in SUPPORTED_FORMATS
-        assert "sas7bdat" in SUPPORTED_FORMATS
+        assert "xpt" in SUPPORTED_FORMATS
     else:
         assert "sav" not in SUPPORTED_FORMATS
-        assert "sas7bdat" not in SUPPORTED_FORMATS
+        assert "xpt" not in SUPPORTED_FORMATS

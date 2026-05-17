@@ -41,9 +41,11 @@ class ExportJobCreateIn(BaseModel):
             ``SUPPORTED_FORMATS`` at runtime; otherwise the route
             returns 400 ``export_format_unsupported``. The mandatory
             members are ``"csv"``, ``"xlsx"``, and ``"json"``;
-            ``"sav"`` and ``"sas7bdat"`` are accepted only when the
+            ``"sav"`` and ``"xpt"`` are accepted only when the
             optional ``pyreadstat`` dependency is importable on the
-            worker host.
+            worker host. The SAS path is XPORT (``.xpt``) rather than
+            ``.sas7bdat`` because pyreadstat ships only a SAS7BDAT
+            reader; downstream SAS users import via ``PROC CIMPORT``.
         options: Reserved JSONB map for future materialization knobs
             (date range filters, column subsets, locale overrides).
             Currently unused; the worker ignores any contents.
@@ -63,7 +65,8 @@ class ExportJobCreateIn(BaseModel):
         max_length=20,
         description=(
             "Output format identifier. One of csv, xlsx, json (always "
-            "available); sav, sas7bdat (when pyreadstat is installed)."
+            "available); sav, xpt (when pyreadstat is installed). "
+            "The xpt format is SAS Transport (import via PROC CIMPORT)."
         ),
         examples=["csv"],
     )
@@ -104,7 +107,7 @@ class ExportJobOut(BaseModel):
         user_id: UUID of the requesting user.
         survey_id: UUID of the source survey.
         format: Output format identifier; one of ``csv`` / ``xlsx`` /
-            ``json`` / ``sav`` / ``sas7bdat``.
+            ``json`` / ``sav`` / ``xpt``.
         status: Current state-machine position; one of ``queued`` /
             ``running`` / ``succeeded`` / ``failed`` / ``expired``.
         options: Reserved materialization-options map; currently

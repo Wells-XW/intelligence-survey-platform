@@ -40,10 +40,16 @@ class ExportJob(Base):
 
     Format support:
         ``csv`` / ``xlsx`` / ``json`` are mandatory and always
-        available. ``sav`` (SPSS) and ``sas7bdat`` (SAS) are
+        available. ``sav`` (SPSS) and ``xpt`` (SAS Transport) are
         conditional on the ``pyreadstat`` optional dependency being
         importable at worker startup; if it is not, requests for those
         formats are rejected at the API layer before a row is created.
+
+    SAS format note:
+        The platform writes SAS Transport (``.xpt``) rather than
+        ``.sas7bdat``. The pyreadstat library exposes only a SAS7BDAT
+        *reader*; XPORT is the supported write path and downstream
+        SAS users import the file with ``PROC CIMPORT``.
 
     The ``options`` JSONB column is reserved for future filtering knobs
     (date ranges, column subsets, response-status filters, locale
@@ -59,7 +65,7 @@ class ExportJob(Base):
             ``ON DELETE CASCADE``; the survey whose responses are
             being materialized.
         format: Output format identifier; one of ``csv`` / ``xlsx`` /
-            ``json`` / ``sav`` / ``sas7bdat``.
+            ``json`` / ``sav`` / ``xpt``.
         status: Current state-machine position; one of ``queued`` /
             ``running`` / ``succeeded`` / ``failed`` / ``expired``.
         options: Reserved JSONB map for future materialization knobs;

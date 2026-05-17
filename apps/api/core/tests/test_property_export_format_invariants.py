@@ -2,8 +2,8 @@
 
 Validates Property 14 from design.md for the three textual formats —
 CSV, XLSX, JSON — that ship without optional dependencies. The SAV /
-SAS7BDAT half of Property 14 lives in a sibling test file and is
-gated on ``pyreadstat`` being importable.
+XPT half of Property 14 lives in a sibling test file and is gated on
+``pyreadstat`` being importable.
 
 Each test generates a SurveyJS-shaped survey schema and a small list
 of responses, runs the corresponding producer against ``tmp_path``,

@@ -153,7 +153,7 @@ def verify_webhook(body_bytes: bytes, signature_header: str, signing_secret: str
 
 ## 4. Start an Export Job
 
-Supported formats: `csv`, `xlsx`, `json` are always available; `sav` and `sas7bdat` are available when the platform's export worker has `pyreadstat` installed.
+Supported formats: `csv`, `xlsx`, `json` are always available; `sav` and `xpt` are available when the platform's export worker has `pyreadstat` installed. The `xpt` format is SAS Transport; import the resulting file in SAS via `PROC CIMPORT`.
 
 **cURL:**
 

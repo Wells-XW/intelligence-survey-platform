@@ -8,11 +8,17 @@ same column order.
 
 Format support detection:
     ``SUPPORTED_FORMATS`` is initialized to ``{"csv", "xlsx", "json"}``
-    and conditionally extended with ``{"sav", "sas7bdat"}`` when the
+    and conditionally extended with ``{"sav", "xpt"}`` when the
     ``pyreadstat`` library is importable in the worker's runtime
     environment. The route layer reads this set on every create
     request to reject unsupported formats with a 400 response per
     Req 5.3.
+
+    The SAS path uses XPORT (``.xpt``) rather than the originally
+    specified ``.sas7bdat`` because pyreadstat exposes only a SAS7BDAT
+    *reader* (no ``write_sas7bdat`` exists at any released version);
+    XPORT is the supported write format and downstream SAS users
+    import via ``PROC CIMPORT``. See ``sas_producer.py`` for details.
 
 Reference: design.md §Component 7.
 """
@@ -49,8 +55,8 @@ _PYREADSTAT_AVAILABLE: bool = _detect_pyreadstat()
 
 if _PYREADSTAT_AVAILABLE:
     from .sav_producer import write_sav  # noqa: F401
-    from .sas_producer import write_sas7bdat  # noqa: F401
-    SUPPORTED_FORMATS: FrozenSet[str] = _BASE_FORMATS | {"sav", "sas7bdat"}
+    from .sas_producer import write_xport  # noqa: F401
+    SUPPORTED_FORMATS: FrozenSet[str] = _BASE_FORMATS | {"sav", "xpt"}
 else:
     SUPPORTED_FORMATS: FrozenSet[str] = _BASE_FORMATS
 

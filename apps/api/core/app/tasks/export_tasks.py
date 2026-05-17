@@ -25,7 +25,7 @@ memory pressure and worker count:
 
 * XLSX with thousands of rows is memory-heavy because ``openpyxl`` holds
   the whole workbook in memory before writing.
-* SAV and SAS7BDAT via ``pyreadstat`` have a known long-running memory
+* SAV and XPT via ``pyreadstat`` have a known long-running memory
   growth issue.
 
 The ``--max-tasks-per-child=50`` recycle bound caps process RSS so a
@@ -112,14 +112,14 @@ logger = logging.getLogger(__name__)
 _ERROR_MESSAGE_MAX_CHARS: int = 1000
 
 #: Mapping from export format identifier to on-disk file extension. SAV
-#: and SAS7BDAT keep their bespoke extensions because downstream stats
+#: and XPT keep their bespoke extensions because downstream stats
 #: tooling (SPSS, SAS) recognizes those magic suffixes.
 _FORMAT_EXTENSION: dict = {
     "csv": "csv",
     "xlsx": "xlsx",
     "json": "json",
     "sav": "sav",
-    "sas7bdat": "sas7bdat",
+    "xpt": "xpt",
 }
 
 
@@ -220,7 +220,7 @@ async def _async_materialize_export(job_id: str) -> None:
         output_path = job_dir / filename
         temp_path = job_dir / f"{filename}.tmp"
 
-        # Dispatch to the format-specific producer. SAV / SAS7BDAT
+        # Dispatch to the format-specific producer. SAV / XPT
         # imports are inside the conditional branches so a worker
         # without ``pyreadstat`` does not pay the import cost (and does
         # not crash at module load if the native library is missing).
@@ -236,9 +236,9 @@ async def _async_materialize_export(job_id: str) -> None:
         elif fmt == "sav":
             from ..services.export_formats.sav_producer import write_sav
             write_sav(survey, responses, temp_path)
-        elif fmt == "sas7bdat":
-            from ..services.export_formats.sas_producer import write_sas7bdat
-            write_sas7bdat(survey, responses, temp_path)
+        elif fmt == "xpt":
+            from ..services.export_formats.sas_producer import write_xport
+            write_xport(survey, responses, temp_path)
         else:
             # Defensive: format support was validated in session 1, so
             # this branch is unreachable under normal operation.

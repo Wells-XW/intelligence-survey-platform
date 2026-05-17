@@ -9,7 +9,7 @@ Format admission:
     :data:`app.services.export_formats.SUPPORTED_FORMATS` on every request
     rather than caching the value at module-import time. That set is
     initialized to ``{"csv", "xlsx", "json"}`` at process start and is
-    extended with ``{"sav", "sas7bdat"}`` only when ``pyreadstat`` is
+    extended with ``{"sav", "xpt"}`` only when ``pyreadstat`` is
     importable in the worker's runtime environment per design §Component 7.
     Reading it on demand keeps the route honest about format availability
     on a per-host basis.
@@ -89,7 +89,7 @@ _MEDIA_TYPES: dict[str, str] = {
     ),
     "json": "application/json",
     "sav": "application/octet-stream",
-    "sas7bdat": "application/octet-stream",
+    "xpt": "application/octet-stream",
 }
 
 #: Default page size for the list endpoint. Matches the per-feature
