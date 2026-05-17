@@ -12,17 +12,40 @@ Reference: design.md §Component 7 and Requirement 5.6.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Sequence
+
+
+# Strip C0 control characters except TAB (0x09), LF (0x0A), and CR (0x0D).
+# openpyxl raises ``IllegalCharacterError`` on any other byte in this range
+# because the XLSX wire format embeds cell text inside XML and the W3C XML
+# 1.0 §2.2 spec forbids these bytes outright. Survey respondents
+# occasionally paste content from rich-text editors that smuggles in stray
+# control bytes; sanitising them here keeps the export workable.
+# Mirrors the equivalent sanitiser in ``csv_producer._stringify``.
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
 def _coerce_to_xlsx(value: Any) -> Any:
     """Coerce an answer value to a type the XLSX writer accepts.
 
     openpyxl can persist ``str``, ``int``, ``float``, ``bool``,
-    ``datetime``, and ``None`` directly. Lists and dicts are encoded
-    as compact JSON strings so the cell holds a faithful textual
-    representation of the original answer.
+    ``datetime``, and ``None`` directly, but rejects strings that
+    contain XML-illegal control characters with
+    :class:`openpyxl.utils.exceptions.IllegalCharacterError`. Lists
+    and dicts are encoded as compact JSON strings so the cell holds a
+    faithful textual representation of the original answer; any string
+    output is then run through :data:`_CONTROL_CHARS_RE` to strip the
+    illegal bytes.
+
+    ``None`` is converted to an empty string rather than left as
+    ``None``: an entirely-``None`` row is dropped by the XLSX wire
+    format on save (``ws.max_row`` collapses to the last non-empty
+    row), which would silently lose responses whose answer dict is
+    empty or whose every answered question lies outside the canonical
+    column set. Writing ``""`` materialises the row so reload sees the
+    correct ``len(responses) + 1`` row count.
 
     Args:
         value: The raw answer value from ``response.answers``.
@@ -31,12 +54,19 @@ def _coerce_to_xlsx(value: Any) -> Any:
         A value openpyxl can write into a cell.
     """
     if value is None:
-        return None
+        return ""
     if isinstance(value, (list, dict)):
-        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    if isinstance(value, (str, int, float, bool)):
+        return _CONTROL_CHARS_RE.sub(
+            "",
+            json.dumps(value, ensure_ascii=False, separators=(",", ":")),
+        )
+    if isinstance(value, bool):
         return value
-    return str(value)
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        return _CONTROL_CHARS_RE.sub("", value)
+    return _CONTROL_CHARS_RE.sub("", str(value))
 
 
 def write_xlsx(

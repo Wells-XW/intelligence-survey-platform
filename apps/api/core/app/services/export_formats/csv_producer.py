@@ -13,8 +13,20 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from pathlib import Path
 from typing import Any, Sequence
+
+
+# Strip C0 control characters except TAB (0x09), LF (0x0A), and CR (0x0D).
+# These bytes are not legal in CSV cells consumed by Excel, LibreOffice, or
+# Python's own ``csv.reader`` (which raises ``_csv.Error: line contains NUL``
+# on NUL bytes). Survey respondents occasionally paste content from rich-text
+# editors that smuggles in stray control bytes; sanitising them here keeps
+# every textual export round-trippable. The set is the W3C XML 1.0 §2.2
+# illegal-control-character range minus the three whitespace characters
+# spreadsheets actually need.
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
 def _stringify(value: Any) -> str:
@@ -23,7 +35,9 @@ def _stringify(value: Any) -> str:
     Primitives stringify directly. Lists and dicts (e.g. checkbox
     arrays, matrix answers) are JSON-encoded with ``ensure_ascii=False``
     so Chinese characters survive round-trip. ``None`` becomes an
-    empty string.
+    empty string. Stray C0 control bytes (NUL through 0x1F minus
+    TAB/LF/CR) are stripped because they are illegal in cells consumed
+    by Excel, LibreOffice, and Python's own ``csv.reader``.
 
     Args:
         value: The raw answer value from ``response.answers``.
@@ -34,10 +48,15 @@ def _stringify(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, (list, dict)):
-        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    return str(value)
+        text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    elif isinstance(value, bool):
+        text = "true" if value else "false"
+    else:
+        text = str(value)
+    # Sanitise control chars after coercion so the rule applies uniformly
+    # to plain strings, JSON-encoded structures, and ``str(...)``-coerced
+    # values alike.
+    return _CONTROL_CHARS_RE.sub("", text)
 
 
 def write_csv(

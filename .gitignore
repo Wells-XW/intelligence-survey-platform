@@ -46,3 +46,6 @@ htmlcov/
 
 # Turbo
 .turbo/
+
+# Hypothesis property-test cache
+.hypothesis/

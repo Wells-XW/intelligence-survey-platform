@@ -62,7 +62,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - `generate_plaintext(env: str) -> tuple[str, str, str]` returning `(plaintext, key_prefix, sha256_hex)`.
     - `verify(plaintext: str, expected_hash: str) -> bool` using `hmac.compare_digest`.
     - _Requirements: 2.3_
-  - [ ]* 3.3 Property test P5: Expired credential rejection
+  - [x]* 3.3 Property test P5: Expired credential rejection
     - **Property 5: Expired credential rejection**
     - Hypothesis strategy generates `ApiKey` rows with `expires_at` drawn from the past and from the future; assert past keys yield 401 + `api_key_expired` and future keys authenticate.
     - `@settings(max_examples=100)`.
@@ -147,7 +147,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - **Property 1: Plaintext credential exposure is exactly-once (webhook clause)**
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 3.1, 3.4**
-  - [ ]* 7.5 Property test P9: Webhook request construction
+  - [x]* 7.5 Property test P9: Webhook request construction
     - **Property 9: Webhook request construction**
     - Hypothesis strategy generates random payload dicts, secrets, event types, delivery IDs; assert the request constructed by the signer plus header builder carries all five required headers and the signature equals the stdlib reference.
     - `@settings(max_examples=100)`.
@@ -238,7 +238,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
   - [x] 11.5 Implement retention sweeper Celery beat job
     - Runs hourly; finds jobs with `status='succeeded' AND completed_at < now - retention_window`, deletes the on-disk file, updates row to `expired`, emits `export.job.expired` audit row.
     - _Requirements: 5.12_
-  - [ ]* 11.6 Property test P12: Export format admission
+  - [x]* 11.6 Property test P12: Export format admission
     - **Property 12: Export format admission**
     - Hypothesis strategy generates random format strings; assert membership in the runtime supported set is exactly equivalent to the create endpoint's accept / reject decision (with `export_format_unsupported` on reject).
     - `@settings(max_examples=100)`.
@@ -248,7 +248,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Strategy generates random sequences of worker outcomes plus retention sweeps; assert monotone status lattice, `started_at <= completed_at`, file existence matches `status`, no partial files survive `failed`.
     - `@settings(max_examples=100)`.
     - **Validates: Requirements 5.4, 5.9, 5.12**
-  - [ ]* 11.8 Property test P14: Export format structural invariants (CSV / XLSX / JSON)
+  - [x]* 11.8 Property test P14: Export format structural invariants (CSV / XLSX / JSON)
     - **Property 14: Export format structural invariants (textual formats)**
     - Strategy generates small random surveys (SurveyJS-shaped schemas) and response lists keyed against them; assert the CSV BOM and header order, XLSX single sheet and dimensions, JSON list-of-objects with subset keys.
     - `@settings(max_examples=100)`.
@@ -258,7 +258,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - Strategy as in P14 textual; round-trip via `pyreadstat`; assert variable label and value label maps. `pyreadstat` write-and-read is slow, so use `@settings(max_examples=20)` per design §Testing Strategy.
     - Skip when `pyreadstat` is not importable.
     - **Validates: Requirements 5.8**
-  - [ ]* 11.10 Property test P15: Export download authorization
+  - [x]* 11.10 Property test P15: Export download authorization
     - **Property 15: Export download authorization**
     - Strategy generates random `(job_status, caller, token validity)` tuples; assert the response code matches the design predicate (200 only when status=succeeded AND one of the three accepted auth paths holds).
     - `@settings(max_examples=100)`.
@@ -280,7 +280,7 @@ Property tasks reference design properties P1 through P25 and the requirements c
     - JWT-authenticated requests bypass the per-key counter path.
     - On `redis.ConnectionError` / timeout (`socket_timeout=1.0`), return 503 + `rate_limiter.backend_unavailable` and emit the matching audit row.
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
-  - [ ]* 13.2 Property test P16: Rate-limit decision predicate
+  - [x]* 13.2 Property test P16: Rate-limit decision predicate
     - **Property 16: Rate-limit decision predicate**
     - Strategy generates `(Lm, Lh, Ld)` quotas and post-increment `(Cm, Ch, Cd)` counts; assert allow / deny equals `Cm > Lm OR Ch > Lh OR Cd > Ld`, that the headers on allow match the spec, and that `Retry-After` on deny equals `min(reset(w) - now)` over the exceeded windows.
     - Use `fakeredis` for speed. `@settings(max_examples=100)`.
